@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="sv-SE">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="robots" content="noindex" />
+        <meta
+            http-equiv="Cache-Control"
+            content="no-cache, no-store, must-revalidate"
+        />
+        <meta http-equiv="Pragma" content="no-cache" />
+        <meta http-equiv="Expires" content="0" />
+        <link
+            rel="stylesheet"
+            id="typography-font-css"
+            href="https://cloud.typography.com/7834156/7581372/css/fonts.css?ver=1.0"
+            type="text/css"
+            media="all"
+        />
+        <link
+            rel="stylesheet"
+            id="typotheque-font-css"
+            href="https://fonts.typotheque.com/WF-028850-009702.css?ver=1.0"
+            type="text/css"
+            media="all"
+        />
+        <link rel="stylesheet" href="/css/style.css" type="text/css" />
+        <title>FHP - Rapportera förköp</title>
+    </head>
+    <body>
+        <div>
+            <nav>
+                <ul>
+                    <li>
+                        <img
+                            src="https://www.folketshusochparker.se/wp-content/themes/fhp/assets/img/logo-white-landscape.svg"
+                            height="30px"
+                            alt="Folkets Hus &amp; Parker"
+                        />
+                    </li>
+                </ul>
+            </nav>
+            <h1>{{.Title}}</h1>
+        </div>
+        <div>
+            <h2>Rapportera totala förköp för nedanstående evenemang</h2>
+            <form
+                action="/form-post/{{.ID}}"
+                method="POST"
+                onsubmit="myButton.disabled = true; return true;"
+            >
+                {{range $i, $e := .Events}}
+                <p>Evenemang: {{.Name}}, datum: {{.Date}}</p>
+                <p>
+                    <label for="00_{{$i}}">Totalt antal förköp:</label>
+                    <input
+                        type="number"
+                        id="00_{{$i}}"
+                        name="00_{{$i}}"
+                        value="0"
+                    />
+                </p>
+                <p>
+                    <label for="10_{{$i}}">Biljettlänk:</label>
+                    <input
+                        type="url"
+                        id="10_{{$i}}"
+                        name="10_{{$i}}"
+                        value="{{.Url}}"
+                    />
+                </p>
+                <p>{{end}}</p>
+                <input type="submit" value="Skicka in" name="myButton" />
+            </form>
+        </div>
+    </body>
+</html>

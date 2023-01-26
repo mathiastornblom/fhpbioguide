@@ -1,0 +1,127 @@
+html {
+    box-sizing: border-box;
+    cursor: default;
+    font-family: 'Parmigiano Piccolo Regular';
+    font-style: normal;
+    font-weight: normal;
+    font-size: 16px;
+    line-height: 1.625;
+    color: #000;
+}
+body {
+    margin: 0px 5px;
+}
+body nav {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
+}
+h1,
+h2,
+h3 {
+    margin: 0 0 0.2em;
+    text-transform: uppercase;
+    font-family: 'Knockout 27 A', 'Knockout 27 B';
+    font-style: normal;
+    font-weight: 400;
+}
+ul {
+    width: 100%;
+    display: flex;
+    justify-content: left;
+    box-sizing: border-box;
+    padding: 20px;
+    background: #000;
+}
+div {
+    padding: 20px 10px;
+}
+div #total {
+    text-align: right;
+}
+
+input[type='number'],
+select {
+    display: block;
+    padding: 0 20px;
+    color: #000;
+    background-color: #fff;
+    box-shadow: inset 0 0 32px -10px rgba(0, 0, 0, 0.5);
+    border-radius: 0;
+    border: 1px solid #afafb1;
+    height: 35px;
+    width: 75px;
+    font-size: 0.9rem;
+    font-family: 'Futura';
+    font-style: normal;
+    font-weight: 500;
+    transition: border-color 0.2s;
+}
+
+input[type='url'],
+select {
+    display: block;
+    padding: 0 20px;
+    color: #000;
+    background-color: #fff;
+    box-shadow: inset 0 0 32px -10px rgba(0, 0, 0, 0.5);
+    border-radius: 0;
+    border: 1px solid #afafb1;
+    height: 35px;
+    width: 400px;
+    font-size: 0.9rem;
+    font-family: 'Futura';
+    font-style: normal;
+    font-weight: 500;
+    transition: border-color 0.2s;
+}
+
+input[type='submit'] {
+    background-color: #27a7a7;
+    border: none;
+    color: white;
+    padding: 12px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 8px 0;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+input[type='submit']:hover {
+    background-color: #5bd1cd;
+}
+
+table {
+    width: 45%;
+}
+th {
+    text-align: left;
+}
+td {
+    width: 50%;
+}
+hr {
+    width: 46%;
+}
+.button {
+    font-family: 'Parmigiano Piccolo Regular';
+    font-style: normal;
+    font-weight: normal;
+    font-size: 16px;
+    line-height: 1.625;
+}
+/* Style the button that is used to open and close the collapsible content */
+.collapsible {
+    background-color: #eee;
+    color: #444;
+    cursor: pointer;
+    padding: 18px;
+    width: 400px;
+    border: none;
+    text-align: left;
+    outline: none;
+    font-size: 15px;
+}
