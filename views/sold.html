@@ -1,342 +1,335 @@
 <!DOCTYPE html>
 <html lang="sv-SE">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="robots" content="noindex" />
-        <meta
-            http-equiv="Cache-Control"
-            content="no-cache, no-store, must-revalidate"
-        />
-        <meta http-equiv="Pragma" content="no-cache" />
-        <meta http-equiv="Expires" content="0" />
-        <link
-            rel="stylesheet"
-            id="typography-font-css"
-            href="https://cloud.typography.com/7834156/7581372/css/fonts.css?ver=1.0"
-            type="text/css"
-            media="all"
-        />
-        <link
-            rel="stylesheet"
-            id="typotheque-font-css"
-            href="https://fonts.typotheque.com/WF-028850-009702.css?ver=1.0"
-            type="text/css"
-            media="all"
-        />
-        <link rel="stylesheet" href="/css/style.css" type="text/css" />
-        <title>FHP - Slutredovisning</title>
-    </head>
-    <body>
-        <div>
-            <nav>
-                <ul>
-                    <li>
-                        <img
-                            src="https://www.folketshusochparker.se/wp-content/themes/fhp/assets/img/logo-white-landscape.svg"
-                            height="30px"
-                            alt="Folkets Hus &amp; Parker"
-                        />
-                    </li>
-                </ul>
-            </nav>
-            <h1>{{.Title}}</h1>
-        </div>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex" />
+		<meta
+			http-equiv="Cache-Control"
+			content="no-cache, no-store, must-revalidate"
+		/>
+		<meta http-equiv="Pragma" content="no-cache" />
+		<meta http-equiv="Expires" content="0" />
+		<link
+			rel="stylesheet"
+			id="typography-font-css"
+			href="https://cloud.typography.com/7834156/7581372/css/fonts.css?ver=1.0"
+			type="text/css"
+			media="all"
+		/>
+		<link
+			rel="stylesheet"
+			id="typotheque-font-css"
+			href="https://fonts.typotheque.com/WF-028850-009702.css?ver=1.0"
+			type="text/css"
+			media="all"
+		/>
+		<link rel="stylesheet" href="/css/style.css" type="text/css" />
+		<script src="script/formValidation.js"></script>
+		<title>FHP - Slutredovisning</title>
+	</head>
+	<body>
+		<div>
+			<nav>
+				<ul>
+					<li>
+						<img
+							src="https://www.folketshusochparker.se/wp-content/themes/fhp/assets/img/logo-white-landscape.svg"
+							height="30px"
+							alt="Folkets Hus &amp; Parker"
+						/>
+					</li>
+				</ul>
+			</nav>
+			<h1>{{.Title}}</h1>
+		</div>
 
-        <div>
-            <h2>{{.Desc}}</h2>
-            <form
-                action="/form-post/{{.ID}}"
-                method="POST"
-                onsubmit="myButton.disabled = true; return true;"
-            >
-                {{range $i, $e := .Events}}
-                <div>
-                    <h4>Evenemang: {{.Name}}</h4>
-                    <p>Visnings datum: {{.Date}}</p>
-                    <p>Ange antal per kategori och alla priser exkl moms.</p>
-                    <table id="Tickets">
-                        <tr>
-                            <th>
-                                <label for="00_{{$i}}"
-                                    >Antal ordinarie biljetter</label
-                                >
-                            </th>
-                            <th>
-                                <label for="01_{{$i}}">Biljettpris (kr)</label>
-                            </th>
-                        </tr>
-                        <tr>
-                            <td>
-                                <input
-                                    type="number"
-                                    id="00_{{$i}}"
-                                    name="00_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
-                            <td>
-                                <input
-                                    type="number"
-                                    step="any"
-                                    id="01_{{$i}}"
-                                    name="01_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
-                        </tr>
-                    </table>
-                    <table id="FreeTickets">
-                        <tr>
-                            <th>
-                                <label for="10_{{$i}}"
-                                    >Antal fribiljetter</label
-                                >
-                            </th>
-                        </tr>
-                        <td>
-                            <input
-                                type="number"
-                                id="10_{{$i}}"
-                                name="10_{{$i}}"
-                                min="0"
-                                value="0"
-                            />
-                        </td>
-                    </table>
-                    <table id="KidsTickets">
-                        <tr>
-                            <th>
-                                <label for="20_{{$i}}"
-                                    >Antal biljetter Barn/Ungdom under 26 år:
-                                    25%</label
-                                >
-                            </th>
-                            <th>
-                                <label for="21_{{$i}}">Biljettpris (kr)</label>
-                            </th>
-                        </tr>
-                        <tr>
-                            <td>
-                                <input
-                                    type="number"
-                                    id="20_{{$i}}"
-                                    name="20_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
-                            <td>
-                                <input
-                                    type="number"
-                                    id="21_{{$i}}"
-                                    name="21_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
-                        </tr>
-                    </table>
-                    <table id="PlaysTickets">
-                        <tr>
-                            <th>
-                                <label for="30_{{$i}}"
-                                    >Antal Abonnemang på minst 5
-                                    förestlläningar: 25%</label
-                                >
-                            </th>
+		<div>
+			<h2>{{.Desc}}</h2>
+			<form
+				action="/form-post/{{.ID}}"
+				method="POST"
+				onsubmit="myButton.disabled = true; return true;"
+			>
+				{{range $i, $e := .Events}}
+				<div>
+					<h4>Evenemang: {{.Name}}</h4>
+					<p>Visnings datum: {{.Date}}</p>
+					<p>Ange antal per kategori och alla priser exkl moms.</p>
+					<table id="Tickets">
+						<tr>
+							<th>
+								<label for="00_{{$i}}">Antal ordinarie biljetter</label>
+							</th>
+							<th>
+								<label for="01_{{$i}}">Biljettpris (kr)</label>
+							</th>
+						</tr>
+						<tr>
+							<td>
+								<input
+									type="number"
+									id="00_{{$i}}"
+									name="00_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
+							<td>
+								<input
+									type="number"
+									step="any"
+									id="01_{{$i}}"
+									name="01_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
+						</tr>
+					</table>
+					<table id="FreeTickets">
+						<tr>
+							<th>
+								<label for="10_{{$i}}">Antal fribiljetter</label>
+							</th>
+						</tr>
+						<td>
+							<input
+								type="number"
+								id="10_{{$i}}"
+								name="10_{{$i}}"
+								min="0"
+								value="0"
+							/>
+						</td>
+					</table>
+					<table id="KidsTickets">
+						<tr>
+							<th>
+								<label for="20_{{$i}}"
+									>Antal biljetter Barn/Ungdom under 26 år: 25%</label
+								>
+							</th>
+							<th>
+								<label for="21_{{$i}}">Biljettpris (kr)</label>
+							</th>
+						</tr>
+						<tr>
+							<td>
+								<input
+									type="number"
+									id="20_{{$i}}"
+									name="20_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
+							<td>
+								<input
+									type="number"
+									id="21_{{$i}}"
+									name="21_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
+						</tr>
+					</table>
+					<table id="PlaysTickets">
+						<tr>
+							<th>
+								<label for="30_{{$i}}"
+									>Antal Abonnemang på minst 5 förestlläningar: 25%</label
+								>
+							</th>
 
-                            <th>
-                                <label for="31_{{$i}}">Biljettpris (kr)</label>
-                            </th>
-                        </tr>
-                        <tr>
-                            <td>
-                                <input
-                                    type="number"
-                                    id="30_{{$i}}"
-                                    name="30_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
+							<th>
+								<label for="31_{{$i}}">Biljettpris (kr)</label>
+							</th>
+						</tr>
+						<tr>
+							<td>
+								<input
+									type="number"
+									id="30_{{$i}}"
+									name="30_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
 
-                            <td>
-                                <input
-                                    type="number"
-                                    id="31_{{$i}}"
-                                    name="31_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
-                        </tr>
-                    </table>
-                    <table id="ScenTickets">
-                        <tr>
-                            <th>
-                                <label for="40_{{$i}}"
-                                    >Antal Scenpass Sverige: 10%</label
-                                >
-                            </th>
-                            <th>
-                                <label for="41_{{$i}}">Biljettpris (kr)</label>
-                            </th>
-                        </tr>
-                        <tr>
-                            <td>
-                                <input
-                                    type="number"
-                                    id="40_{{$i}}"
-                                    name="40_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
+							<td>
+								<input
+									type="number"
+									id="31_{{$i}}"
+									name="31_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
+						</tr>
+					</table>
+					<table id="ScenTickets">
+						<tr>
+							<th>
+								<label for="40_{{$i}}">Antal Scenpass Sverige: 10%</label>
+							</th>
+							<th>
+								<label for="41_{{$i}}">Biljettpris (kr)</label>
+							</th>
+						</tr>
+						<tr>
+							<td>
+								<input
+									type="number"
+									id="40_{{$i}}"
+									name="40_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
 
-                            <td>
-                                <input
-                                    type="number"
-                                    id="41_{{$i}}"
-                                    name="41_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
-                        </tr>
-                    </table>
-                    <table id="KonstTickets">
-                        <tr>
-                            <th>
-                                <label for="50_{{$i}}"
-                                    >Antal Sveriges konstföreningar: 10%</label
-                                >
-                            </th>
-                            <th>
-                                <label for="51_{{$i}}">Biljettpris (kr)</label>
-                            </th>
-                        </tr>
-                        <tr>
-                            <td>
-                                <input
-                                    type="number"
-                                    id="50_{{$i}}"
-                                    name="50_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
+							<td>
+								<input
+									type="number"
+									id="41_{{$i}}"
+									name="41_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
+						</tr>
+					</table>
+					<table id="KonstTickets">
+						<tr>
+							<th>
+								<label for="50_{{$i}}"
+									>Antal Sveriges konstföreningar: 10%</label
+								>
+							</th>
+							<th>
+								<label for="51_{{$i}}">Biljettpris (kr)</label>
+							</th>
+						</tr>
+						<tr>
+							<td>
+								<input
+									type="number"
+									id="50_{{$i}}"
+									name="50_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
 
-                            <td>
-                                <input
-                                    type="number"
-                                    id="51_{{$i}}"
-                                    name="51_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
-                        </tr>
-                    </table>
-                    <table id="MetTickets">
-                        <tr>
-                            <th>
-                                <label for="80_{{$i}}">Met-rabatt: 10%</label>
-                            </th>
-                            <th>
-                                <label for="81_{{$i}}">Biljettpris (kr)</label>
-                            </th>
-                        </tr>
-                        <tr>
-                            <td>
-                                <input
-                                    type="number"
-                                    id="80_{{$i}}"
-                                    name="80_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
+							<td>
+								<input
+									type="number"
+									id="51_{{$i}}"
+									name="51_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
+						</tr>
+					</table>
+					<table id="MetTickets">
+						<tr>
+							<th>
+								<label for="80_{{$i}}">Met-rabatt: 10%</label>
+							</th>
+							<th>
+								<label for="81_{{$i}}">Biljettpris (kr)</label>
+							</th>
+						</tr>
+						<tr>
+							<td>
+								<input
+									type="number"
+									id="80_{{$i}}"
+									name="80_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
 
-                            <td>
-                                <input
-                                    type="number"
-                                    id="81_{{$i}}"
-                                    name="81_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
-                        </tr>
-                    </table>
-                    <table id="OtherTickets">
-                        <tr>
-                            <th>
-                                <label for="60_{{$i}}">Annan</label>
-                            </th>
-                            <th>
-                                <label for="61_{{$i}}">Biljettpris (kr)</label>
-                            </th>
-                        </tr>
-                        <tr>
-                            <td>
-                                <input
-                                    type="number"
-                                    id="60_{{$i}}"
-                                    name="60_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
+							<td>
+								<input
+									type="number"
+									id="81_{{$i}}"
+									name="81_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
+						</tr>
+					</table>
+					<table id="OtherTickets">
+						<tr>
+							<th>
+								<label for="60_{{$i}}">Annan</label>
+							</th>
+							<th>
+								<label for="61_{{$i}}">Biljettpris (kr)</label>
+							</th>
+						</tr>
+						<tr>
+							<td>
+								<input
+									type="number"
+									id="60_{{$i}}"
+									name="60_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
 
-                            <td>
-                                <input
-                                    type="number"
-                                    id="61_{{$i}}"
-                                    name="61_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
-                        </tr>
-                    </table>
-                    <table id="Other2Tickets">
-                        <tr>
-                            <th>
-                                <label for="70_{{$i}}">Annan 2</label>
-                            </th>
-                            <th>
-                                <label for="71_{{$i}}">Biljettpris (kr)</label>
-                            </th>
-                        </tr>
-                        <tr>
-                            <td>
-                                <input
-                                    type="number"
-                                    id="70_{{$i}}"
-                                    name="70_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
+							<td>
+								<input
+									type="number"
+									id="61_{{$i}}"
+									name="61_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
+						</tr>
+					</table>
+					<table id="Other2Tickets">
+						<tr>
+							<th>
+								<label for="70_{{$i}}">Annan 2</label>
+							</th>
+							<th>
+								<label for="71_{{$i}}">Biljettpris (kr)</label>
+							</th>
+						</tr>
+						<tr>
+							<td>
+								<input
+									type="number"
+									id="70_{{$i}}"
+									name="70_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
 
-                            <td>
-                                <input
-                                    type="number"
-                                    id="71_{{$i}}"
-                                    name="71_{{$i}}"
-                                    min="0"
-                                    value="0"
-                                />
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-                <p>{{end}}</p>
-                <input type="submit" value="Skicka in" name="myButton" />
-            </form>
-        </div>
-    </body>
+							<td>
+								<input
+									type="number"
+									id="71_{{$i}}"
+									name="71_{{$i}}"
+									min="0"
+									value="0"
+								/>
+							</td>
+						</tr>
+					</table>
+				</div>
+				<p>{{end}}</p>
+				<input type="submit" value="Skicka in" name="myButton" />
+			</form>
+		</div>
+	</body>
 </html>
