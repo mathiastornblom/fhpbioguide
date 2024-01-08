@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/go-co-op/gocron v1.35.3
-	github.com/go-resty/resty/v2 v2.10.0
+	github.com/go-resty/resty/v2 v2.11.0
 	github.com/gofiber/fiber/v2 v2.50.0
 	github.com/gofiber/template v1.6.27
 	github.com/google/uuid v1.4.0
