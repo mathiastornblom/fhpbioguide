@@ -77,8 +77,8 @@ func scheduleExportJob(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioG
 	// Initialize a new task scheduler
 	s := gocron.NewScheduler(time.Local)
 	s.Every(1).Days().At("02:00").Do(func() {
-		fmt.Printf("Creates a scheduled task at 02:00 \n")
-		log.Printf("Creates a scheduled task at 02:00 \n")
+		fmt.Printf("Creates a scheduled task at 02:00 \n\r")
+		log.Printf("Creates a scheduled task at 02:00 \n\r")
 		// Reauthenticate api token for dynamicsClient
 		dynamicsClient.AuthenticateApi()
 

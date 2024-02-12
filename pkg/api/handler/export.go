@@ -17,7 +17,7 @@ import (
 )
 
 func ExecuteExports(movieService movieexport.UseCase, cashreportService cashreports.UseCase, theatreService theatreexport.UseCase) {
-	MovieExport(movieService)
+	//MovieExport(movieService)
 	CashExport(cashreportService, movieService, theatreService)
 	// CashListExport(cashreportService, movieService, theatreService)
 	// TheatreExport(theatreService)
@@ -41,7 +41,7 @@ func MovieExport(service movieexport.UseCase) error {
 
 	// Loop through each movie in the export data
 	for id, movie := range data.Body.ExportResponse.Document.Data.Movies.Movie {
-		fmt.Printf("Working on movie %v/%v \n", id, numTotal)
+		fmt.Printf("Working on movie %v/%v \n\r", id, numTotal)
 
 		// Check if the movie's distributor is "Folkets Hus och Parker"
 		if movie.Distributor.Name != "" && movie.Distributor.Name == "Folkets Hus och Parker" {
@@ -70,7 +70,7 @@ func MovieExport(service movieexport.UseCase) error {
 				if d, err := time.Parse("2006-01-02T15:04:05", movie.PremiereDate); err == nil {
 					premiereDate = d
 				} else {
-					fmt.Printf("Skipping movie with invalid premiere date: %v\n", err)
+					fmt.Printf("Skipping movie with invalid premiere date: %v\n\r", err)
 					continue
 				}
 			} else {
@@ -83,7 +83,7 @@ func MovieExport(service movieexport.UseCase) error {
 				if r, err := strconv.Atoi(movie.Runtime); err == nil {
 					runtime = r
 				} else {
-					fmt.Printf("Skipping movie with invalid runtime: %v\n", err)
+					fmt.Printf("Skipping movie with invalid runtime: %v\n\r", err)
 					continue
 				}
 			} else {
@@ -158,11 +158,11 @@ func TheatreExport(service theatreexport.UseCase) {
 	// Loop over all theatres and their associated salons
 	numTotal := len(data.Body.ExportResponse.Document.Data.Theatres.Theatre)
 	for id, theatre := range data.Body.ExportResponse.Document.Data.Theatres.Theatre {
-		fmt.Printf("Working on theatre %v/%v \n", id, numTotal)
+		fmt.Printf("Working on theatre %v/%v \n\r", id, numTotal)
 
 		numTotal2 := len(theatre.Salons.Salon)
 		for id, salon := range theatre.Salons.Salon {
-			fmt.Printf("Working on salon %v/%v \n", id, numTotal2)
+			fmt.Printf("Working on salon %v/%v \n\r", id, numTotal2)
 
 			// Check if salon is already in Dynamics 365
 			newLocation := true
@@ -237,14 +237,14 @@ func CashExport(service cashreports.UseCase, movieService movieexport.UseCase, t
 	// Loop over all cash reports
 	numTotal1 := len(data.Body.ExportResponse.Document.Data.Cashreports.Cashreport)
 	for id1, report := range data.Body.ExportResponse.Document.Data.Cashreports.Cashreport {
-		fmt.Printf("Working on report %v / %v \n", id1, numTotal1)
-		log.Printf("Working on report %v / %v \n", id1, numTotal1)
+		fmt.Printf("Working on report %v / %v \n\r", id1, numTotal1)
+		log.Printf("Working on report %v / %v \n\r", id1, numTotal1)
 
 		// Loop over all shows in the current cash report
 		numTotal := len(report.Shows.Show)
 		for id, show := range report.Shows.Show {
-			fmt.Printf("Working on show %v / %v \n", id, numTotal)
-			log.Printf("Working on show %v / %v \n", id, numTotal)
+			fmt.Printf("Working on show %v / %v \n\r", id, numTotal)
+			log.Printf("Working on show %v / %v \n\r", id, numTotal)
 
 			// Extract necessary data from the cash report and create a new DynamicsCashReport object
 			movieNum := "" + strings.Split(report.Movie.FullMovieNumber, "-")[2]
@@ -275,7 +275,12 @@ func CashExport(service cashreports.UseCase, movieService movieexport.UseCase, t
 			}
 
 			// Check if a booking exists for the current show and export it to Dynamics 365 if it does
-			showTime, _ := time.Parse("2006-01-02T15:04:05", show.StartDateTime)
+			showTime, errParseTime := time.Parse("2006-01-02T15:04:05", show.StartDateTime)
+			if (errParseTime != nil ) {
+			fmt.Printf("showTime: %v \n\r show.StartDateTime: %v \n\r", showTime.String(), show.StartDateTime)
+			log.Printf("showTime: %v \n\r show.StartDateTime: %v \n\r", showTime.String(), show.StartDateTime)
+			}
+
 			if len(theatres) > 0 && len(movies) > 0 {
 				bookings, _ := service.FindBookingD365("_new_customer_value%20eq%20" + theatres[0].AccountData.Accountid + "%20and%20_new_product_value%20eq%20" + movies[0].ID + "%20and%20" + "new_showdate%20eq%20" + showTime.Format("2006-01-02"))
 				if len(bookings) > 0 {
@@ -286,7 +291,9 @@ func CashExport(service cashreports.UseCase, movieService movieexport.UseCase, t
 
 			// Set the vat-free field in the reportLine object
 			reportLine.VatFree = report.Salon.VatFree == "1"
-
+			
+			reportLine.ShowDate = showTime // Set the ShowDate field of the DynamicsCashReport object to the parsed show start date and time
+			
 			// Loop over all ticket details for the current show and create a new DynamicsCashReport object for each one
 			for _, ticketDetail := range show.TicketDetails.Detail {
 				quantity, _ := strconv.Atoi(ticketDetail.Quantity)
@@ -301,6 +308,8 @@ func CashExport(service cashreports.UseCase, movieService movieexport.UseCase, t
 				// Export the new DynamicsCashReport object to Dynamics 365 as JSON
 				jsData, _ := json.Marshal(reportLine)
 				service.PostToD365("new_cashreports", string(jsData))
+				fmt.Printf("Saving cashreport: %v \n\r", string(jsData))
+				log.Printf("Saving cashreport:%v \n\r", string(jsData) )
 			}
 		}
 	}
@@ -312,7 +321,7 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 
 	// Iterate through each cashreport and process them
 	for id1, report := range data.Body.ExportResponse.Document.Data.Cashreports.Cashreport {
-		fmt.Printf("Working on report %v / %v \n", id1, numTotal1)
+		fmt.Printf("Working on report %v / %v \n\r", id1, numTotal1)
 		newCashreport := true
 		d365Cashreport, _ := service.FilteredFetchD365("new_cashreportnumber%20eq%20'" + report.CashreportNumber + "'") // Check if Cashreport is already in Dynamics365
 		for _, d365Cr := range d365Cashreport {
@@ -324,7 +333,7 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 		if newCashreport {
 			numTotal := len(report.Shows.Show) // Get the total number of shows in the cashreport
 			for id, show := range report.Shows.Show {
-				fmt.Printf("Working on show %v / %v \n", id, numTotal)
+				fmt.Printf("Working on show %v / %v \n\r", id, numTotal)
 				movieNum := "" + strings.Split(report.Movie.FullMovieNumber, "-")[2]                            // Extract the movie number from the FullMovieNumber field
 				playweekStart, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.StartDate)                // Parse the start date of the playweek
 				playweekEnd, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.EndDate)                    // Parse the end date of the playweek
@@ -395,8 +404,8 @@ func UpdateCashreports(updatedDate time.Time, service cashreports.UseCase, movie
 
 	// Iterate through each cashreport and check if it is already in Dynamics365
 	for id1, report := range data.Body.ExportResponse.Document.Data.Cashreports.Cashreport {
-		fmt.Printf("Working on report %v / %v \n", id1, numTotal1)
-		log.Printf("Working on report %v / %v \n", id1, numTotal1)
+		fmt.Printf("Working on report %v / %v \n\r", id1, numTotal1)
+		log.Printf("Working on report %v / %v \n\r", id1, numTotal1)
 		d365Cashreport, _ := service.FilteredFetchD365("new_source%20eq%20100000000%20and%20new_cashreportnumber%20eq%20'" + report.CashreportNumber + "'")
 
 		for _, d365Cr := range d365Cashreport {
@@ -422,8 +431,8 @@ func CashListExport(service cashreports.UseCase, movieService movieexport.UseCas
 
 	numTotal1 := len(data.Body.ExportResponse.Document.Data.Dates.Date) // Get the total number of dates in the cashreport list data
 	for id1, report := range data.Body.ExportResponse.Document.Data.Dates.Date {
-		fmt.Printf("Working on date %v : %v / %v \n", report.UpdatedDate, id1, numTotal1)
-		log.Printf("Working on date %v : %v / %v \n", report.UpdatedDate, id1, numTotal1)
+		fmt.Printf("Working on date %v : %v / %v \n\r", report.UpdatedDate, id1, numTotal1)
+		log.Printf("Working on date %v : %v / %v \n\r", report.UpdatedDate, id1, numTotal1)
 		d, _ := time.Parse("2006-01-02T15:04:05", report.UpdatedDate+"T00:00:00")
 		CashExportWithDate(d, service, movieService, theatreService)
 		UpdateCashreports(d, service, movieService, theatreService)

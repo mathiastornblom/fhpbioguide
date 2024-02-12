@@ -48,9 +48,9 @@ func (r *CashReportRepository) Export(updatedDate time.Time) (response *entity.C
 </document>`
 
 	resp, err := r.bioguidenClient.SOAPRequest("CashReportsDistributorExport.asmx", xmlDocument)
-	//fmt.Println(string(resp))
+	fmt.Println("XMLDocument from BioGuiden: %w\n", string(resp))
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println("Error from bioguiden %w\n", err.Error())
 	}
 	xml.Unmarshal(resp, &response)
 
