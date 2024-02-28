@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+
+	//"html"
 	"log"
 	"net/http"
 	"strconv"
@@ -30,6 +32,7 @@ func MakeReportForms(app *fiber.App, service reportform.UseCase) {
 	app.Post("/api/genform/presale/:ID", createPresaleForm(service))
 	app.Post("/api/genform/sold/:ID", createSoldForm(service))
 	app.Post("/api/regenform/sold/:ID", recreateSoldForm(service))
+	app.Post("/api/orderstatus", proxyrequest())
 	//app.Post("/api/importcashreports/:DATE", importCashreports())
 }
 
@@ -37,6 +40,32 @@ func getStatus() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		log.Printf("Sending status")
 		return c.SendStatus(http.StatusOK)
+	}
+}
+
+func proxyrequest() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		log.Printf("Reciving order status from Movie Transit")
+		url := "https://prod-176.westeurope.logic.azure.com:443/workflows/7262ccd7210a42be91d4d377bc284815/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Ek4W82BZbiacsW1sivrYpldeY2dzBd9ch3BnJy46EpM"
+		headers := c.GetReqHeaders()
+		if headers["Authorization"][0] != "123456" {
+			log.Printf("Wring Authorization")
+			return c.SendStatus(http.StatusForbidden)
+		}
+		delete(headers,"Authorization" )
+		
+		// Send the POST request
+		resp, err := http.Post(url, "application/json", bytes.NewBuffer(c.BodyRaw()))
+			if err != nil {
+				log.Fatalf("Error sending POST request: %v", err)
+				return c.SendStatus(http.StatusBadGateway)
+			}
+		if resp.StatusCode == 200 {
+			return c.SendStatus(http.StatusOK)
+		}
+		defer resp.Body.Close() // Ensure the response body is closed after the function returns
+
+		return c.SendStatus(http.StatusBadRequest)
 	}
 }
 
