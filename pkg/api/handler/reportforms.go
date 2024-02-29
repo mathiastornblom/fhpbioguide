@@ -48,7 +48,7 @@ func proxyrequest() fiber.Handler {
 		log.Printf("Reciving order status from Movie Transit")
 		url := "https://prod-176.westeurope.logic.azure.com:443/workflows/7262ccd7210a42be91d4d377bc284815/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Ek4W82BZbiacsW1sivrYpldeY2dzBd9ch3BnJy46EpM"
 		headers := c.GetReqHeaders()
-		if headers["Authorization"][0] != "123456" {
+		if headers["Authorization"][0] != "Basic aW50LWZocC1tdGFwaS11YXQ6Y3NXMXNpdnJZcGxkZVkyZHpCZDljaA==" {
 			log.Printf("Wring Authorization")
 			return c.SendStatus(http.StatusForbidden)
 		}
