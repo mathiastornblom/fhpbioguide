@@ -44,33 +44,41 @@ func getStatus() fiber.Handler {
 }
 
 func proxyRequest() fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		log.Printf("Receiving order status from Movie Transit")
-		url := "https://prod-176.westeurope.logic.azure.com:443/workflows/7262ccd7210a42be91d4d377bc284815/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Ek4W82BZbiacsW1sivrYpldeY2dzBd9ch3BnJy46EpM"
+    return func(c *fiber.Ctx) error {
+        log.Printf("Receiving order status from Movie Transit")
 
-		// Safe access to Authorization header
-		authHeader := c.Get("Authorization")
-		if authHeader != "Basic aW50LWZocC1tdGFwaS11YXQ6Y3NXMXNpdnJZcGxkZVkyZHpCZDljaA==" {
-			log.Printf("Wrong Authorization")
-			return c.SendStatus(http.StatusForbidden)
-		}
+        // Validate Authorization header
+        authHeader := c.Get("Authorization")
+        expectedAuth := viper.GetString("proxy.Bearer")
+        if authHeader != expectedAuth {
+            log.Printf("Unauthorized access attempt")
+            return c.SendStatus(http.StatusUnauthorized) // More specific status code for authorization issues
+        }
 
-		// Prepare the request body for proxying
-		reqBody := bytes.NewBuffer(c.BodyRaw())
-		resp, err := http.Post(url, "application/json", reqBody)
-		if err != nil {
-			log.Printf("Error sending POST request: %v", err) // Changed from log.Fatalf to log.Printf
-			return c.SendStatus(http.StatusBadGateway)
-		}
-		defer resp.Body.Close() // Ensure the response body is closed
+        url := viper.GetString("proxy.URL")
+        reqBody := bytes.NewBuffer(c.BodyRaw())
+        resp, err := http.Post(url, "application/json", reqBody)
+        if err != nil {
+            log.Printf("Failed to send POST request: %v", err)
+            return c.Status(http.StatusBadGateway).SendString("Failed to proxy request") // Returning a 502 Bad Gateway to indicate a proxy error
+        }
+        defer func() {
+            if resp != nil {
+                resp.Body.Close()
+            }
+        }()
 
-		if resp.StatusCode == 200 {
-			return c.SendStatus(http.StatusOK)
-		}
+        if resp.StatusCode != http.StatusOK {
+            log.Printf("Received non-OK status from proxied service: %d", resp.StatusCode)
+            // Optionally, you could forward the response status code from the proxied service
+            return c.Status(resp.StatusCode).SendString("Proxied service responded with error")
+        }
 
-		return c.SendStatus(http.StatusBadRequest)
-	}
+        // Successfully proxied the request
+        return c.SendStatus(http.StatusOK)
+    }
 }
+
 
 
 func getForm(service reportform.UseCase) fiber.Handler {
@@ -331,13 +339,13 @@ func postFormResult(service reportform.UseCase) fiber.Handler {
 				// Marshal the payload into JSON format
 				jsonData, err := json.Marshal(payload)
 				if err != nil {
-					log.Fatalf("Error marshalling JSON: %v", err)
+					log.Printf("Error marshalling JSON: %v", err)
 				}
 
 				// Send the POST request with the JSON data
 				resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 				if err != nil {
-					log.Fatalf("Error sending POST request: %v", err)
+					log.Printf("Error sending POST request: %v", err)
 				}
 				defer resp.Body.Close() // Ensure the response body is closed after the function returns
 			}
@@ -520,13 +528,13 @@ func postFormResult(service reportform.UseCase) fiber.Handler {
 				// Marshal the payload into JSON format
 				jsonData, err := json.Marshal(payload)
 				if err != nil {
-					log.Fatalf("Error marshalling JSON: %v", err)
+					log.Printf("Error marshalling JSON: %v", err)
 				}
 
 				// Send the POST request with the JSON data
 				resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 				if err != nil {
-					log.Fatalf("Error sending POST request: %v", err)
+					log.Printf("Error sending POST request: %v", err)
 				}
 				defer resp.Body.Close() // Ensure the response body is closed after the function returns
 
