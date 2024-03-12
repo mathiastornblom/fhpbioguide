@@ -43,43 +43,53 @@ func getStatus() fiber.Handler {
 	}
 }
 
+// proxyRequest returns a Fiber handler function for proxying HTTP requests.
 func proxyRequest() fiber.Handler {
+    // The returned function captures the Fiber context.
     return func(c *fiber.Ctx) error {
         log.Printf("Receiving order status from Movie Transit")
 
-        // Validate Authorization header
+        // Validate Authorization header.
+        // This checks the request's Authorization header against an expected value from the application's configuration.
         authHeader := c.Get("Authorization")
-        expectedAuth := viper.GetString("proxy.Bearer")
+        expectedAuth := viper.GetString("proxy.Bearer") // viper is used for configuration management.
         if authHeader != expectedAuth {
             log.Printf("Unauthorized access attempt")
-            return c.SendStatus(http.StatusUnauthorized) // More specific status code for authorization issues
+            // If the Authorization header doesn't match the expected value, return an HTTP 401 Unauthorized status code.
+            return c.SendStatus(http.StatusUnauthorized)
         }
 
+        // Retrieve the proxy URL from the application's configuration.
         url := viper.GetString("proxy.URL")
+
+        // Create a new buffer with the raw body of the incoming request to forward it.
         reqBody := bytes.NewBuffer(c.BodyRaw())
+
+        // Send the POST request to the proxied service.
         resp, err := http.Post(url, "application/json", reqBody)
         if err != nil {
+            // Log the error and return an HTTP 502 Bad Gateway status code if the request to the proxied service fails.
             log.Printf("Failed to send POST request: %v", err)
-            return c.Status(http.StatusBadGateway).SendString("Failed to proxy request") // Returning a 502 Bad Gateway to indicate a proxy error
+            return c.Status(http.StatusBadGateway).SendString("Failed to proxy request")
         }
+        // Ensure the response body is closed to prevent resource leaks.
         defer func() {
             if resp != nil {
                 resp.Body.Close()
             }
         }()
 
+        // Check if the status code from the proxied service is not OK (200).
         if resp.StatusCode != http.StatusOK {
             log.Printf("Received non-OK status from proxied service: %d", resp.StatusCode)
-            // Optionally, you could forward the response status code from the proxied service
+            // Forward the response status code from the proxied service and return an error message.
             return c.Status(resp.StatusCode).SendString("Proxied service responded with error")
         }
 
-        // Successfully proxied the request
+        // If the proxied request was successful, return an HTTP 200 OK status code.
         return c.SendStatus(http.StatusOK)
     }
 }
-
-
 
 func getForm(service reportform.UseCase) fiber.Handler {
 	return func(c *fiber.Ctx) error {

@@ -423,18 +423,36 @@ func UpdateCashreports(updatedDate time.Time, service cashreports.UseCase, movie
 	}
 }
 
+// CashListExport exports and processes cash list data for a given date range, with added error handling.
 func CashListExport(service cashreports.UseCase, movieService movieexport.UseCase, theatreService theatreexport.UseCase) {
-	fmt.Printf("CashListExport")
+	fmt.Printf("CashListExport") // Initial log message indicating the start of the export process.
+	// Define the start and end dates for the export.
 	startDate := time.Date(2023, 8, 27, 0, 0, 0, 0, time.Local)
 	endDate := time.Date(2023, 8, 29, 23, 59, 59, 99, time.Local)
-	data, _ := service.ExportList(startDate, endDate)
+	// Export the list of cash reports within the defined date range.
+	data, err := service.ExportList(startDate, endDate)
+	if err != nil {
+		log.Printf("Error exporting list: %v\n", err)
+		return // Exit the function if there is an error.
+	}
 
-	numTotal1 := len(data.Body.ExportResponse.Document.Data.Dates.Date) // Get the total number of dates in the cashreport list data
+	// Get the total number of dates in the cash report list data.
+	numTotal1 := len(data.Body.ExportResponse.Document.Data.Dates.Date)
+	// Iterate through each date in the cash report data.
 	for id1, report := range data.Body.ExportResponse.Document.Data.Dates.Date {
+		// Log the current date being processed.
 		fmt.Printf("Working on date %v : %v / %v \n\r", report.UpdatedDate, id1, numTotal1)
 		log.Printf("Working on date %v : %v / %v \n\r", report.UpdatedDate, id1, numTotal1)
-		d, _ := time.Parse("2006-01-02T15:04:05", report.UpdatedDate+"T00:00:00")
+		// Parse the date from the report.
+		d, parseErr := time.Parse("2006-01-02T15:04:05", report.UpdatedDate+"T00:00:00")
+		if parseErr != nil {
+			log.Printf("Error parsing date %v: %v\n", report.UpdatedDate, parseErr)
+			continue // Skip this iteration if there's an error parsing the date.
+		}
+		// Process and export cash data for the parsed date.
 		CashExportWithDate(d, service, movieService, theatreService)
+		// Update cash reports for the parsed date.
 		UpdateCashreports(d, service, movieService, theatreService)
 	}
 }
+

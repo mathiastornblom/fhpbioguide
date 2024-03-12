@@ -3,27 +3,30 @@ package entity
 import "time"
 
 type Form struct {
-	ID     ID `gorm:"primary_key"`
-	Name   string
-	Text   string
-	Type   int
-	Date   time.Time
-	Events []Event
+	ID     ID `gorm:"primary_key"` // Unique identifier for the Form, marked as a primary key for GORM.
+	Name   string                  // Human-readable name of the Form.
+	Text   string                  // Descriptive text associated with the Form.
+	Type   int                     // Numeric code or identifier indicating the Form's type.
+	Date   time.Time               // Timestamp indicating when the Form was created or relevant for.
+	Events []Event                 // Slice of Event structs associated with this Form.
 }
+
 
 type Event struct {
-	ID             ID `gorm:"primary_key"`
-	Form_type      int
-	Name           string
-	Text           string
-	Date           string
-	Amount         int
-	Url            string
-	ExpirationTime time.Time
-	FormID         ID `gorm:"primary_key"`
-	Discounts      string
+	ID             ID `gorm:"primary_key"`   // Unique identifier for the Event.
+	Form_type      int                      // May indicate the type of form this event is associated with.
+	Name           string                   // Human-readable name of the Event.
+	Text           string                   // Descriptive text associated with the Event.
+	Date           string                   // The date (as a string) the Event is scheduled for or relevant.
+	Amount         int                      // An amount associated with the Event, possibly a cost or a limit.
+	Url            string                   // A URL for more information or for an action related to the Event.
+	ExpirationTime time.Time                // Timestamp indicating when the Event expires or is no longer relevant.
+	FormID         ID `gorm:"primary_key"`  // The ID of the Form this Event is associated with.
+	Discounts      string                   // Information about any discounts associated with the Event.
 }
 
+// Fields map directly to a Dynamics 365 schema for booking entities, with JSON tags indicating
+// how each Go field maps to JSON fields in Dynamics 365 API responses
 type Booking struct {
 	ID                 string `json:"new_bokningarkundid"`
 	Name               string `json:"new_name"`
@@ -42,6 +45,7 @@ type Booking struct {
 	} `json:"new_product"`
 }
 
+// A wrapper for a slice of Booking structs.
 type Bookings struct {
 	Value []Booking `json:"value"`
 }

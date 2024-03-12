@@ -5,8 +5,14 @@ import (
 	"time"
 )
 
+// CashReportsDistributoristExport represents the XML structure of a cash report export.
 type CashReportsDistributoristExport struct {
+    // XMLName defines the root element name and the associated namespaces and attributes.
 	XMLName xml.Name `xml:"Envelope"`
+    // The remaining fields map the hierarchical structure of the XML document, capturing
+    // information about the report, such as details on the distributor, the movies shown,
+    // the salons/theatres where they were shown, and detailed ticketing information for each show.
+    // Nested structs represent the depth of the XML structure, allowing for accurate parsing and data extraction.
 	Text    string   `xml:",chardata"`
 	Soap    string   `xml:"soap,attr"`
 	Xsi     string   `xml:"xsi,attr"`
@@ -201,6 +207,9 @@ type CashReportsDistributoristExport struct {
 	} `xml:"Body"`
 }
 
+// CashReportsDistributoristListExport defines the structure for exporting a list of cash reports.
+// It includes fields for parsing the XML structure that summarizes the cash report data,
+// such as the number of cash reports per date, salon, or movie, and includes a search interval for the report generation.
 type CashReportsDistributoristListExport struct {
 	XMLName xml.Name `xml:"Envelope"`
 	Text    string   `xml:",chardata"`
@@ -279,6 +288,8 @@ type CashReportsDistributoristListExport struct {
 	} `xml:"Body"`
 }
 
+// DynamicsBooking represents the structure of a booking record in Dynamics 365.
+// It includes fields for the booking details, such as the show date, customer information, product details, and tickets sold.
 type DynamicsBooking struct {
 	ID                 string `json:"new_bokningarkundid,omitempty"`
 	Name               string `json:"new_name,omitempty"`
@@ -302,18 +313,27 @@ type DynamicsBooking struct {
 	TicketPrice float64 `json:"new_ticketpricebioguiden,omitempty"`
 }
 
+// DynamicsBookings is a container for a slice of DynamicsBooking pointers,
+// allowing for the collection of multiple booking records.
 type DynamicsBookings struct {
 	Value []*DynamicsBooking `json:"value"`
 }
 
+// DynamicsBookingPost represents a structure used for posting updates to a booking record,
+// specifically for updating tickets sold and ticket price information.
 type DynamicsBookingPost struct {
 	TicketsSold int     `json:"new_ticketssoldbioguiden,omitempty"`
 	TicketPrice float64 `json:"new_ticketpricebioguiden,omitempty"`
 }
 
+// DynamicsCashReports is a container for a slice of DynamicsCashReport pointers,
+// allowing for the collection of multiple cash reports records.
 type DynamicsCashReports struct {
 	Items []*DynamicsCashReport `json:"value"`
 }
+
+// DynamicsCashReport represents a structure used for posting updates to a cach report record,
+// specifically for updating tickets sold and ticket price information.
 type DynamicsCashReport struct {
 	ID                    string    `json:"new_cashreportid,omitempty"`
 	Name                  string    `json:"new_name"`
