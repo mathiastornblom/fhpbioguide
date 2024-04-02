@@ -31,7 +31,7 @@ func NewMovieExportRepository(dynamics *d365.D365, bioClient *bioguide.BioGuiden
 func (r *MovieExportRepository) Export(startDate, endDate time.Time) (response *entity.MovieExportList, err error) {
 	hostname, _ := os.Hostname()
 	xmlDocument := `<?xml version="1.0" encoding="iso8859-1"?>
-<document schema="MoviesExportSchema1_12.xsd">
+<document schema="MoviesExportSchema1_13.xsd">
     <information>
         <name>Movies export</name>
         <description></description>
