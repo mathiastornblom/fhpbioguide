@@ -427,8 +427,8 @@ func UpdateCashreports(updatedDate time.Time, service cashreports.UseCase, movie
 func CashListExport(service cashreports.UseCase, movieService movieexport.UseCase, theatreService theatreexport.UseCase) {
 	fmt.Printf("CashListExport") // Initial log message indicating the start of the export process.
 	// Define the start and end dates for the export.
-	startDate := time.Date(2024, 3, 18, 0, 0, 0, 0, time.Local)
-	endDate := time.Date(2024, 3, 19, 23, 59, 59, 99, time.Local)
+	startDate := time.Date(2024, 4, 04, 0, 0, 0, 0, time.Local)
+	endDate := time.Date(2024, 4, 15, 23, 59, 59, 99, time.Local)
 	// Export the list of cash reports within the defined date range.
 	data, err := service.ExportList(startDate, endDate)
 	if err != nil {
