@@ -282,10 +282,21 @@ func CashExport(service cashreports.UseCase, movieService movieexport.UseCase, t
 			}
 
 			if len(theatres) > 0 && len(movies) > 0 {
-				bookings, _ := service.FindBookingD365("_new_customer_value%20eq%20" + theatres[0].AccountData.Accountid + "%20and%20_new_product_value%20eq%20" + movies[0].ID + "%20and%20" + "new_showdate%20eq%20" + showTime.Format("2006-01-02"))
-				if len(bookings) > 0 {
+				bookings, _ := service.FindBookingD365(
+					"_new_customer_value%20eq%20" + theatres[0].AccountData.Accountid +
+					"%20and%20_new_product_value%20eq%20" + movies[0].ID +
+					"%20and%20new_showdate%20eq%20"  + showTime.Format("2006-01-02"))
+			
+				if len(bookings) > 0 &&
+					shouldLinkBooking(service, bookings[0].ID, report.CashreportNumber) {
+			
+					// koppla raden till bokningen
 					reportLine.Booking = "/new_bokningarkunds(" + bookings[0].ID + ")"
-					service.PostToD365("new_bokningarkunds("+bookings[0].ID+")", `{"new_Lokaler@odata.bind":"/new_lokals(`+theatres[0].LoakalID+`)"}`)
+			
+					// uppdatera bokningen med lokal
+					service.PostToD365(
+						"new_bokningarkunds("+bookings[0].ID+")",
+						`{"new_Lokaler@odata.bind":"/new_lokals(` + theatres[0].LoakalID + `)"}`)
 				}
 			}
 
@@ -363,12 +374,21 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 				showTime, _ := time.Parse("2006-01-02T15:04:05", show.StartDateTime) // Parse the start date and time of the show
 
 				if len(theatres) > 0 && len(movies) > 0 {
-					// Fetch bookings from Dynamics365 based on the theatre, movie, and show date
-					bookings, _ := service.FindBookingD365("_new_customer_value%20eq%20" + theatres[0].AccountData.Accountid + "%20and%20_new_product_value%20eq%20" + movies[0].ID + "%20and%20" + "new_showdate%20eq%20" + showTime.Format("2006-01-02"))
-					if len(bookings) > 0 {
+					bookings, _ := service.FindBookingD365(
+						"_new_customer_value%20eq%20" + theatres[0].AccountData.Accountid +
+						"%20and%20_new_product_value%20eq%20" + movies[0].ID +
+						"%20and%20new_showdate%20eq%20"  + showTime.Format("2006-01-02"))
+				
+					if len(bookings) > 0 &&
+						shouldLinkBooking(service, bookings[0].ID, report.CashreportNumber) {
+				
+						// koppla raden till bokningen
 						reportLine.Booking = "/new_bokningarkunds(" + bookings[0].ID + ")"
-						// Update the Lokaler field of the booking in Dynamics365
-						service.PostToD365("new_bokningarkunds("+bookings[0].ID+")", `{"new_Lokaler@odata.bind":"/new_lokals(`+theatres[0].LoakalID+`)"}`)
+				
+						// uppdatera bokningen med lokal
+						service.PostToD365(
+							"new_bokningarkunds("+bookings[0].ID+")",
+							`{"new_Lokaler@odata.bind":"/new_lokals(` + theatres[0].LoakalID + `)"}`)
 					}
 				}
 
@@ -456,3 +476,44 @@ func CashListExport(service cashreports.UseCase, movieService movieexport.UseCas
 	}
 }
 
+// shouldLinkBooking tells if the current cash-report row may link to a booking.
+//
+// Link is allowed when
+//   • the booking has no linked rows, or
+//   • every linked row (we read the first) shares the same cash-report number.
+//
+// When a mismatch is found we print and log a note, then refuse the link.
+//
+// Params
+//   s         – service that talks to Dynamics 365  
+//   bookingID – booking GUID, no braces or quotes  
+//   reportNum – cash-report number of the row we process
+//
+// Returns
+//   true  – link is allowed  
+//   false – link is denied
+func shouldLinkBooking(s cashreports.UseCase, bookingID, reportNum string) bool {
+
+	// Fetch rows already linked to this booking.
+	existing, _ := s.FilteredFetchD365(
+		"_new_booking_value%20eq%20" + bookingID)
+
+	// No row linked → safe to link.
+	if len(existing) == 0 {
+		return true
+	}
+
+	// A row exists. Check its cash-report number.
+	if existing[0].ReportNum != reportNum {
+		fmt.Printf(
+			"Skip link: booking %s already tied to cash-report %s, current %s\n",
+			bookingID, existing[0].ReportNum, reportNum)
+		log.Printf(
+			"Skip link: booking %s already tied to cash-report %s, current %s",
+			bookingID, existing[0].ReportNum, reportNum)
+		return false
+	}
+
+	// Match found → link is allowed.
+	return true
+}
