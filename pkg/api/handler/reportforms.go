@@ -45,50 +45,50 @@ func getStatus() fiber.Handler {
 
 // proxyRequest returns a Fiber handler function for proxying HTTP requests.
 func proxyRequest() fiber.Handler {
-    // The returned function captures the Fiber context.
-    return func(c *fiber.Ctx) error {
-        log.Printf("Receiving order status from Movie Transit")
+	// The returned function captures the Fiber context.
+	return func(c *fiber.Ctx) error {
+		log.Printf("Receiving order status from Movie Transit")
 
-        // Validate Authorization header.
-        // This checks the request's Authorization header against an expected value from the application's configuration.
-        authHeader := c.Get("Authorization")
-        expectedAuth := viper.GetString("proxy.Bearer") // viper is used for configuration management.
-        if authHeader != expectedAuth {
-            log.Printf("Unauthorized access attempt")
-            // If the Authorization header doesn't match the expected value, return an HTTP 401 Unauthorized status code.
-            return c.SendStatus(http.StatusUnauthorized)
-        }
+		// Validate Authorization header.
+		// This checks the request's Authorization header against an expected value from the application's configuration.
+		authHeader := c.Get("Authorization")
+		expectedAuth := viper.GetString("proxy.Bearer") // viper is used for configuration management.
+		if authHeader != expectedAuth {
+			log.Printf("Unauthorized access attempt")
+			// If the Authorization header doesn't match the expected value, return an HTTP 401 Unauthorized status code.
+			return c.SendStatus(http.StatusUnauthorized)
+		}
 
-        // Retrieve the proxy URL from the application's configuration.
-        url := viper.GetString("proxy.URL")
+		// Retrieve the proxy URL from the application's configuration.
+		url := viper.GetString("proxy.URL")
 
-        // Create a new buffer with the raw body of the incoming request to forward it.
-        reqBody := bytes.NewBuffer(c.BodyRaw())
+		// Create a new buffer with the raw body of the incoming request to forward it.
+		reqBody := bytes.NewBuffer(c.BodyRaw())
 
-        // Send the POST request to the proxied service.
-        resp, err := http.Post(url, "application/json", reqBody)
-        if err != nil {
-            // Log the error and return an HTTP 502 Bad Gateway status code if the request to the proxied service fails.
-            log.Printf("Failed to send POST request: %v", err)
-            return c.Status(http.StatusBadGateway).SendString("Failed to proxy request")
-        }
-        // Ensure the response body is closed to prevent resource leaks.
-        defer func() {
-            if resp != nil {
-                resp.Body.Close()
-            }
-        }()
+		// Send the POST request to the proxied service.
+		resp, err := http.Post(url, "application/json", reqBody)
+		if err != nil {
+			// Log the error and return an HTTP 502 Bad Gateway status code if the request to the proxied service fails.
+			log.Printf("Failed to send POST request: %v", err)
+			return c.Status(http.StatusBadGateway).SendString("Failed to proxy request")
+		}
+		// Ensure the response body is closed to prevent resource leaks.
+		defer func() {
+			if resp != nil {
+				resp.Body.Close()
+			}
+		}()
 
-        // Check if the status code from the proxied service is not OK (200).
-        if resp.StatusCode != http.StatusOK {
-            log.Printf("Received non-OK status from proxied service: %d", resp.StatusCode)
-            // Forward the response status code from the proxied service and return an error message.
-            return c.Status(resp.StatusCode).SendString("Proxied service responded with error")
-        }
+		// Check if the status code from the proxied service is not OK (200).
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("Received non-OK status from proxied service: %d", resp.StatusCode)
+			// Forward the response status code from the proxied service and return an error message.
+			return c.Status(resp.StatusCode).SendString("Proxied service responded with error")
+		}
 
-        // If the proxied request was successful, return an HTTP 200 OK status code.
-        return c.SendStatus(http.StatusOK)
-    }
+		// If the proxied request was successful, return an HTTP 200 OK status code.
+		return c.SendStatus(http.StatusOK)
+	}
 }
 
 func getForm(service reportform.UseCase) fiber.Handler {
@@ -338,7 +338,7 @@ func postFormResult(service reportform.UseCase) fiber.Handler {
 			for id, event := range form.Events {
 				service.PostToD365("new_forkops", `{"new_boking@odata.bind":"new_bokningarkunds(`+event.ID.String()+`)","new_forkopsurl":"`+c.FormValue("10_"+strconv.Itoa(id))+`","new_unit":`+c.FormValue("00_"+strconv.Itoa(id), "0")+`}`)
 				// Define the API endpoint
-				url := "https://prod-182.westeurope.logic.azure.com:443/workflows/26b97772aeb345009eecf08a0e8ed059/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ZwBhpD1ssuT79oT_aQoe9h-Ke9gtdXOT_eVhXHWruP8"
+				url := "https://dcf5d3602d82484caa8f70f597e2c3.59.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/26b97772aeb345009eecf08a0e8ed059/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=-Q28UL28_Y4BiYQm4Y9hXuz7jKFmZVDbUkXvgqsqs_Y"
 
 				// Create the payload with the required data
 				payload := Payload{
@@ -527,7 +527,7 @@ func postFormResult(service reportform.UseCase) fiber.Handler {
 
 				}
 				// Define the API endpoint
-				url := "https://prod-182.westeurope.logic.azure.com:443/workflows/26b97772aeb345009eecf08a0e8ed059/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ZwBhpD1ssuT79oT_aQoe9h-Ke9gtdXOT_eVhXHWruP8"
+				url := "https://dcf5d3602d82484caa8f70f597e2c3.59.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/26b97772aeb345009eecf08a0e8ed059/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=-Q28UL28_Y4BiYQm4Y9hXuz7jKFmZVDbUkXvgqsqs_Y"
 
 				// Create the payload with the required data
 				payload := Payload{
