@@ -250,7 +250,7 @@ func CashExport(service cashreports.UseCase, movieService movieexport.UseCase, t
 			movieNum := "" + strings.Split(report.Movie.FullMovieNumber, "-")[2]
 			playweekStart, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.StartDate)
 			playweekEnd, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.EndDate)
-			recordedAmount, _ := strconv.ParseFloat(strings.ReplaceAll(show.TotalCashAmount, ",", "."), 32)
+			recordedAmount, _ := strconv.ParseFloat(strings.ReplaceAll(show.TotalDistributorAmount, ",", "."), 32)
 			reportLine := entity.DynamicsCashReport{
 				FKBID:           report.Salon.FkbNumber,
 				Source:          100000000,
@@ -276,35 +276,35 @@ func CashExport(service cashreports.UseCase, movieService movieexport.UseCase, t
 
 			// Check if a booking exists for the current show and export it to Dynamics 365 if it does
 			showTime, errParseTime := time.Parse("2006-01-02T15:04:05", show.StartDateTime)
-			if (errParseTime != nil ) {
-			fmt.Printf("showTime: %v \n\r show.StartDateTime: %v \n\r", showTime.String(), show.StartDateTime)
-			log.Printf("showTime: %v \n\r show.StartDateTime: %v \n\r", showTime.String(), show.StartDateTime)
+			if errParseTime != nil {
+				fmt.Printf("showTime: %v \n\r show.StartDateTime: %v \n\r", showTime.String(), show.StartDateTime)
+				log.Printf("showTime: %v \n\r show.StartDateTime: %v \n\r", showTime.String(), show.StartDateTime)
 			}
 
 			if len(theatres) > 0 && len(movies) > 0 {
 				bookings, _ := service.FindBookingD365(
 					"_new_customer_value%20eq%20" + theatres[0].AccountData.Accountid +
-					"%20and%20_new_product_value%20eq%20" + movies[0].ID +
-					"%20and%20new_showdate%20eq%20"  + showTime.Format("2006-01-02"))
-			
+						"%20and%20_new_product_value%20eq%20" + movies[0].ID +
+						"%20and%20new_showdate%20eq%20" + showTime.Format("2006-01-02"))
+
 				if len(bookings) > 0 &&
 					shouldLinkBooking(service, bookings[0].ID, report.CashreportNumber) {
-			
+
 					// koppla raden till bokningen
 					reportLine.Booking = "/new_bokningarkunds(" + bookings[0].ID + ")"
-			
+
 					// uppdatera bokningen med lokal
 					service.PostToD365(
 						"new_bokningarkunds("+bookings[0].ID+")",
-						`{"new_Lokaler@odata.bind":"/new_lokals(` + theatres[0].LoakalID + `)"}`)
+						`{"new_Lokaler@odata.bind":"/new_lokals(`+theatres[0].LoakalID+`)"}`)
 				}
 			}
 
 			// Set the vat-free field in the reportLine object
 			reportLine.VatFree = report.Salon.VatFree == "1"
-			
+
 			reportLine.ShowDate = showTime // Set the ShowDate field of the DynamicsCashReport object to the parsed show start date and time
-			
+
 			// Loop over all ticket details for the current show and create a new DynamicsCashReport object for each one
 			for _, ticketDetail := range show.TicketDetails.Detail {
 				quantity, _ := strconv.Atoi(ticketDetail.Quantity)
@@ -320,7 +320,7 @@ func CashExport(service cashreports.UseCase, movieService movieexport.UseCase, t
 				jsData, _ := json.Marshal(reportLine)
 				service.PostToD365("new_cashreports", string(jsData))
 				fmt.Printf("Saving cashreport: %v \n\r", string(jsData))
-				log.Printf("Saving cashreport:%v \n\r", string(jsData) )
+				log.Printf("Saving cashreport:%v \n\r", string(jsData))
 			}
 		}
 	}
@@ -345,11 +345,11 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 			numTotal := len(report.Shows.Show) // Get the total number of shows in the cashreport
 			for id, show := range report.Shows.Show {
 				fmt.Printf("Working on show %v / %v \n\r", id, numTotal)
-				movieNum := "" + strings.Split(report.Movie.FullMovieNumber, "-")[2]                            // Extract the movie number from the FullMovieNumber field
-				playweekStart, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.StartDate)                // Parse the start date of the playweek
-				playweekEnd, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.EndDate)                    // Parse the end date of the playweek
-				recordedAmount, _ := strconv.ParseFloat(strings.ReplaceAll(show.TotalCashAmount, ",", "."), 32) // Parse the total cash amount for the show
-				reportLine := entity.DynamicsCashReport{                                                        // Create a new DynamicsCashReport object
+				movieNum := "" + strings.Split(report.Movie.FullMovieNumber, "-")[2]                                   // Extract the movie number from the FullMovieNumber field
+				playweekStart, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.StartDate)                       // Parse the start date of the playweek
+				playweekEnd, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.EndDate)                           // Parse the end date of the playweek
+				recordedAmount, _ := strconv.ParseFloat(strings.ReplaceAll(show.TotalDistributorAmount, ",", "."), 32) // Parse the total cash amount for the show
+				reportLine := entity.DynamicsCashReport{                                                               // Create a new DynamicsCashReport object
 					FKBID:           report.Salon.FkbNumber,
 					Source:          100000000,
 					Playweek:        playweekStart.Format("2006-01-02") + " - " + playweekEnd.Format("2006-01-02"),
@@ -376,19 +376,19 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 				if len(theatres) > 0 && len(movies) > 0 {
 					bookings, _ := service.FindBookingD365(
 						"_new_customer_value%20eq%20" + theatres[0].AccountData.Accountid +
-						"%20and%20_new_product_value%20eq%20" + movies[0].ID +
-						"%20and%20new_showdate%20eq%20"  + showTime.Format("2006-01-02"))
-				
+							"%20and%20_new_product_value%20eq%20" + movies[0].ID +
+							"%20and%20new_showdate%20eq%20" + showTime.Format("2006-01-02"))
+
 					if len(bookings) > 0 &&
 						shouldLinkBooking(service, bookings[0].ID, report.CashreportNumber) {
-				
+
 						// koppla raden till bokningen
 						reportLine.Booking = "/new_bokningarkunds(" + bookings[0].ID + ")"
-				
+
 						// uppdatera bokningen med lokal
 						service.PostToD365(
 							"new_bokningarkunds("+bookings[0].ID+")",
-							`{"new_Lokaler@odata.bind":"/new_lokals(` + theatres[0].LoakalID + `)"}`)
+							`{"new_Lokaler@odata.bind":"/new_lokals(`+theatres[0].LoakalID+`)"}`)
 					}
 				}
 
@@ -447,8 +447,8 @@ func UpdateCashreports(updatedDate time.Time, service cashreports.UseCase, movie
 func CashListExport(service cashreports.UseCase, movieService movieexport.UseCase, theatreService theatreexport.UseCase) {
 	fmt.Printf("CashListExport") // Initial log message indicating the start of the export process.
 	// Define the start and end dates for the export.
-	startDate := time.Date(2024, 4, 04, 0, 0, 0, 0, time.Local)
-	endDate := time.Date(2024, 4, 15, 23, 59, 59, 99, time.Local)
+	startDate := time.Date(2026, 02, 03, 0, 0, 0, 0, time.Local)
+	endDate := time.Date(2026, 02, 07, 23, 59, 59, 99, time.Local)
 	// Export the list of cash reports within the defined date range.
 	data, err := service.ExportList(startDate, endDate)
 	if err != nil {
@@ -479,19 +479,21 @@ func CashListExport(service cashreports.UseCase, movieService movieexport.UseCas
 // shouldLinkBooking tells if the current cash-report row may link to a booking.
 //
 // Link is allowed when
-//   • the booking has no linked rows, or
-//   • every linked row (we read the first) shares the same cash-report number.
+//   - the booking has no linked rows, or
+//   - every linked row (we read the first) shares the same cash-report number.
 //
 // When a mismatch is found we print and log a note, then refuse the link.
 //
 // Params
-//   s         – service that talks to Dynamics 365  
-//   bookingID – booking GUID, no braces or quotes  
-//   reportNum – cash-report number of the row we process
+//
+//	s         – service that talks to Dynamics 365
+//	bookingID – booking GUID, no braces or quotes
+//	reportNum – cash-report number of the row we process
 //
 // Returns
-//   true  – link is allowed  
-//   false – link is denied
+//
+//	true  – link is allowed
+//	false – link is denied
 func shouldLinkBooking(s cashreports.UseCase, bookingID, reportNum string) bool {
 
 	// Fetch rows already linked to this booking.
