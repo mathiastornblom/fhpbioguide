@@ -53,7 +53,7 @@ func initConfig() {
 // createDynamicsClient sets up the Dynamics 365 API client with configuration values
 func createDynamicsClient() *d365.D365 {
 	return &d365.D365{
-		Resty:        resty.New(),
+		Resty:        resty.New().SetTimeout(30 * time.Second),
 		URL:          viper.GetString("dynamics.url"),
 		TenantID:     viper.GetString("dynamics.tenantid"),
 		ClientID:     viper.GetString("dynamics.clientid"),
@@ -64,7 +64,7 @@ func createDynamicsClient() *d365.D365 {
 // createBioguideClient sets up the BioGuiden API client with configuration values and a log file
 func createBioguideClient(file *os.File) *bioguide.BioGuiden {
 	return &bioguide.BioGuiden{
-		Resty:    resty.New(),
+		Resty:    resty.New().SetTimeout(60 * time.Second),
 		URL:      viper.GetViper().GetString("bio.url"),
 		Username: viper.GetViper().GetString("bio.username"),
 		Password: viper.GetViper().GetString("bio.password"),
@@ -79,8 +79,10 @@ func scheduleExportJob(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioG
 	s.Every(1).Days().At("02:00").Do(func() {
 		fmt.Printf("Creates a scheduled task at 02:00 \n\r")
 		log.Printf("Creates a scheduled task at 02:00 \n\r")
-		// Reauthenticate api token for dynamicsClient
-		dynamicsClient.AuthenticateApi()
+		// Reauthenticate api token for dynamicsClient (auto-refresh also handles mid-run expiry)
+		if err := dynamicsClient.AuthenticateApi(); err != nil {
+			log.Printf("D365 auth error at job start: %v", err)
+		}
 
 		// Create movie export repository and service
 		movieRepository := repository.NewMovieExportRepository(dynamicsClient, bioguidenClient)

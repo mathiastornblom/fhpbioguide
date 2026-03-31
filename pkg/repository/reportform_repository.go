@@ -1,7 +1,9 @@
 package repository
 
 import (
+	"log"
 	"strings"
+	"time"
 
 	"fhpbioguide/pkg/api/d365"
 	"fhpbioguide/pkg/entity"
@@ -11,46 +13,40 @@ import (
 	"gorm.io/gorm"
 )
 
-// CashReportRepository  repo
+// ReportFormRepository repo
 type ReportFormRepository struct {
-	db *gorm.DB
+	db       *gorm.DB
+	dynamics *d365.D365
 }
 
-// NewCashReportRepository create new repository
+// NewReportFormRepository creates a new repository with a single shared D365 client.
+// The client authenticates once here; token auto-refresh handles subsequent expiry.
 func NewReportFormRepository(db *gorm.DB) *ReportFormRepository {
+	dynamicsClient := &d365.D365{
+		Resty:        resty.New().SetTimeout(30 * time.Second),
+		URL:          viper.GetString("dynamics.url"),
+		TenantID:     viper.GetString("dynamics.tenantid"),
+		ClientID:     viper.GetString("dynamics.clientid"),
+		ClientSecret: viper.GetString("dynamics.clientsecret"),
+	}
+	if err := dynamicsClient.AuthenticateApi(); err != nil {
+		log.Printf("Warning: initial D365 auth failed (will retry on first request): %v", err)
+	}
 	return &ReportFormRepository{
-		db: db,
+		db:       db,
+		dynamics: dynamicsClient,
 	}
 }
 
 func (repo *ReportFormRepository) GetFromD365(endpoint string) ([]byte, error) {
-	dynamicsClient := &d365.D365{
-		Resty:        resty.New(),
-		URL:          viper.GetString("dynamics.url"),
-		TenantID:     viper.GetString("dynamics.tenantid"),
-		ClientID:     viper.GetString("dynamics.clientid"),
-		ClientSecret: viper.GetString("dynamics.clientsecret"),
-	}
-	dynamicsClient.AuthenticateApi()
-
-	return dynamicsClient.GetRequest(endpoint)
+	return repo.dynamics.GetRequest(endpoint)
 }
 
 func (repo *ReportFormRepository) PostToD365(endpoint, data string) ([]byte, error) {
-	dynamicsClient := &d365.D365{
-		Resty:        resty.New(),
-		URL:          viper.GetString("dynamics.url"),
-		TenantID:     viper.GetString("dynamics.tenantid"),
-		ClientID:     viper.GetString("dynamics.clientid"),
-		ClientSecret: viper.GetString("dynamics.clientsecret"),
-	}
-	dynamicsClient.AuthenticateApi()
-
 	if strings.Contains(endpoint, "(") {
-		return dynamicsClient.PatchRequest(endpoint, data)
-	} else {
-		return dynamicsClient.PostRequest(endpoint, data)
+		return repo.dynamics.PatchRequest(endpoint, data)
 	}
+	return repo.dynamics.PostRequest(endpoint, data)
 }
 
 func (repo *ReportFormRepository) GetForm(id entity.ID) (e entity.Form, err error) {
@@ -70,14 +66,10 @@ func (repo *ReportFormRepository) Create(e *entity.Form) (id entity.ID, err erro
 }
 
 func (repo *ReportFormRepository) Update(id *entity.Form) (err error) {
-	/* err = repo.db.Debug().Create(e).Error
-	id = e.ID */
 	return
 }
 
 func (repo *ReportFormRepository) CreateOrUpdate(e *entity.Form) (err error) {
-	/* err = repo.db.Debug().Create(e).Error
-	id = e.ID */
 	return
 }
 
