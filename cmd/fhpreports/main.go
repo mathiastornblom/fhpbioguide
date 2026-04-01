@@ -16,6 +16,10 @@ func main() {
 		panic(fmt.Errorf("Fatal error config file: %w \n", err))
 	}
 
+	// Defaults for trigger/lock paths — must match fhpbioguide defaults.
+	viper.SetDefault("sync.triggerFile", "/tmp/fhp_sync_trigger")
+	viper.SetDefault("sync.lockFile", "/tmp/fhp_sync.lock")
+
 	api := api.NewAPI()
 
 	api.StartAPI()

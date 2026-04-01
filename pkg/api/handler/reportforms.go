@@ -8,6 +8,7 @@ import (
 	//"html"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -33,7 +34,7 @@ func MakeReportForms(app *fiber.App, service reportform.UseCase) {
 	app.Post("/api/genform/sold/:ID", createSoldForm(service))
 	app.Post("/api/regenform/sold/:ID", recreateSoldForm(service))
 	app.Post("/api/orderstatus", proxyRequest())
-	//app.Post("/api/importcashreports/:DATE", importCashreports())
+	app.Post("/api/sync/trigger", triggerSync())
 }
 
 func getStatus() fiber.Handler {
@@ -560,5 +561,50 @@ func postFormResult(service reportform.UseCase) fiber.Handler {
 			"Title": "Tack",
 			"Desc":  "Vi har sparat uppgifterna!",
 		})
+	}
+}
+
+// triggerSync writes a trigger file that fhpbioguide's poller picks up within 60s.
+// Both processes must be configured with the same sync.triggerFile and sync.lockFile paths.
+//
+// Responses:
+//
+//	202 Accepted          – trigger file created, sync will start within 60s
+//	202 Accepted          – trigger file already pending (previous trigger not yet consumed)
+//	409 Conflict          – sync is currently running (lock file held)
+//	401 Unauthorized      – missing or wrong Authorization header
+//	500 Internal Error    – could not write trigger file
+func triggerSync() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if c.Get("Authorization") != viper.GetString("report.Bearer") {
+			log.Printf("sync trigger: unauthorized request from %s", c.IP())
+			return c.SendStatus(http.StatusUnauthorized)
+		}
+
+		lockFile := viper.GetString("sync.lockFile")
+		triggerFile := viper.GetString("sync.triggerFile")
+
+		// If lock file is present and not stale, a sync is actively running.
+		if info, err := os.Stat(lockFile); err == nil {
+			if time.Since(info.ModTime()) <= 4*time.Hour {
+				log.Printf("sync trigger: rejected — sync already running (lock age %v)", time.Since(info.ModTime()).Round(time.Second))
+				return c.Status(http.StatusConflict).SendString("sync already in progress")
+			}
+		}
+
+		// Try to create the trigger file exclusively.
+		f, err := os.OpenFile(triggerFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+		if err != nil {
+			if os.IsExist(err) {
+				log.Printf("sync trigger: trigger already pending")
+				return c.Status(http.StatusAccepted).SendString("sync trigger already pending, will start within 60s")
+			}
+			log.Printf("sync trigger: failed to write trigger file: %v", err)
+			return c.Status(http.StatusInternalServerError).SendString("failed to create trigger")
+		}
+		f.Close()
+
+		log.Printf("sync trigger: trigger file created at %s", triggerFile)
+		return c.Status(http.StatusAccepted).SendString("sync triggered, will start within 60s")
 	}
 }

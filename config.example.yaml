@@ -20,3 +20,7 @@ report:
 proxy:
   URL: '<movie-transit-logic-app-webhook-url>'
   Bearer: 'Basic <base64-encoded-credentials>'
+
+sync:
+  triggerFile: '/tmp/fhp_sync_trigger'  # fhpreports writes here; fhpbioguide polls every 60s
+  lockFile:    '/tmp/fhp_sync.lock'     # held during a running sync; prevents concurrent runs
