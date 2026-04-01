@@ -51,9 +51,12 @@
 			>
 				{{range $i, $e := .Events}}
 				<p>Evenemang: {{.Name}}, datum: {{.Date}}</p>
+				{{if gt .Amount 0}}
+				<p class="prev-report">Senast rapporterat: <strong>{{.Amount}}</strong> förköp</p>
+				{{end}}
 				<p>
 					<label for="00_{{$i}}">Totalt antal förköp:</label>
-					<input type="number" id="00_{{$i}}" name="00_{{$i}}" value="0" />
+					<input type="number" id="00_{{$i}}" name="00_{{$i}}" value="{{.Amount}}" />
 				</p>
 				<p>
 					<label for="10_{{$i}}">Biljettlänk:</label>

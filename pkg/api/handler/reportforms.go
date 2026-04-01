@@ -171,13 +171,26 @@ func createPresaleForm(service reportform.UseCase) fiber.Handler {
 
 		// Append bookings to form Events array
 		for _, item := range bookings.Value {
+			// Look up the most recent presale report for this booking so we can
+			// show it as "last reported" text and prefill the quantity field.
+			var prevAmount int
+			forkopsData, forkopsErr := service.GetFromD365(
+				"new_forkops?$filter=_new_boking_value%20eq%20" + item.ID +
+					"&$orderby=createdon%20desc&$top=1&$select=new_unit")
+			if forkopsErr == nil {
+				forkops := entity.DynamicsForkops{}
+				if json.Unmarshal(forkopsData, &forkops) == nil && len(forkops.Value) > 0 {
+					prevAmount = forkops.Value[0].Unit
+				}
+			}
+
 			form.Events = append(form.Events, entity.Event{
 				ID:             entity.UnsafeStringToID(item.ID),
 				Form_type:      0,
 				Name:           item.Product.Name,
 				Text:           item.Name,
 				Date:           item.ShowDate,
-				Amount:         0,
+				Amount:         prevAmount,
 				Url:            item.Url,
 				ExpirationTime: time.Now().Add(24 * time.Hour),
 				FormID:         formID,
