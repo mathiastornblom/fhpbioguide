@@ -10,6 +10,7 @@ import (
 	"fhpbioguide/pkg/api/d365"              // Package for handling the Dynamics 365 API
 	"fhpbioguide/pkg/api/handler"           // Package for executing data export tasks
 	"fhpbioguide/pkg/repository"            // Package containing data repositories for different entities
+	"fhpbioguide/pkg/syncstate"             // Package for persisting sync state across runs
 	"fhpbioguide/pkg/usecase/cashreports"   // Package for handling cash reports use case
 	"fhpbioguide/pkg/usecase/movieexport"   // Package for handling movie exports use case
 	"fhpbioguide/pkg/usecase/theatreexport" // Package for handling theatre exports use case
@@ -79,6 +80,14 @@ func scheduleExportJob(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioG
 	s.Every(1).Days().At("02:00").Do(func() {
 		fmt.Printf("Creates a scheduled task at 02:00 \n\r")
 		log.Printf("Creates a scheduled task at 02:00 \n\r")
+
+		// Capture job start time before running — written to state only on success.
+		jobStart := time.Now()
+
+		// Read last successful sync time to determine how far back to fetch.
+		lastSync := syncstate.ReadState()
+		log.Printf("Sync window: %s → now", lastSync.Format("2006-01-02T15:04:05"))
+
 		// Reauthenticate api token for dynamicsClient (auto-refresh also handles mid-run expiry)
 		if err := dynamicsClient.AuthenticateApi(); err != nil {
 			log.Printf("D365 auth error at job start: %v", err)
@@ -94,11 +103,21 @@ func scheduleExportJob(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioG
 
 		// Create cash report repository and service
 		cashReportRepo := repository.NewCashReportRepository(dynamicsClient, bioguidenClient)
-		cashReportService :=
-			cashreports.NewService(cashReportRepo)
+		cashReportService := cashreports.NewService(cashReportRepo)
 
-		// Execute the data export tasks for movies, cash reports, and theatres
-		handler.ExecuteExports(movieService, cashReportService, theatreService)
+		// Execute the data export tasks for movies and cash reports.
+		// State is only written when ExecuteExports succeeds — if CashExport's
+		// ExportList call fails, the next run will retry from the same lastSync.
+		if err := handler.ExecuteExports(lastSync, movieService, cashReportService, theatreService); err != nil {
+			log.Printf("Export job error: %v — sync state not updated, will retry next run", err)
+			return
+		}
+
+		if err := syncstate.WriteState(jobStart); err != nil {
+			log.Printf("Warning: could not write sync state: %v", err)
+		} else {
+			log.Printf("Sync state updated to %s", jobStart.Format("2006-01-02T15:04:05"))
+		}
 	})
 
 	// Start the task scheduler and block the main function to keep the scheduler running
