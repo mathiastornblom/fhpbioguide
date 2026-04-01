@@ -5,6 +5,8 @@ package d365
 import (
 	"encoding/json" // for encoding and decoding JSON data
 	"fmt"           // for formatting strings
+	"time"          // for token expiry tracking
+
 	"github.com/go-resty/resty/v2" // resty, a simple HTTP and REST client library for Go
 )
 
@@ -24,12 +26,18 @@ type D365 struct {
 	ClientID     string        // Azure AD Client ID
 	ClientSecret string        // Azure AD Client Secret
 	AccessToken  string        // Cached OAuth access token
+	ExpiresAt    time.Time     // When the cached token expires
 }
 
-// AuthenticateApi performs OAuth authentication to obtain an access token
-func (d *D365) AuthenticateApi() {
-	// Make an HTTP POST request to the Azure AD token endpoint
-	resp, _ := d.Resty.R().
+// isTokenValid returns true if we have a non-empty token that has not yet expired.
+func (d *D365) isTokenValid() bool {
+	return d.AccessToken != "" && time.Now().Before(d.ExpiresAt)
+}
+
+// AuthenticateApi performs OAuth authentication to obtain an access token.
+// Returns an error if the request fails or no access token is returned.
+func (d *D365) AuthenticateApi() error {
+	resp, err := d.Resty.R().
 		SetHeader("Content-Type", "application/x-www-form-urlencoded").
 		SetFormData(map[string]string{
 			"client_id":     d.ClientID,
@@ -37,33 +45,50 @@ func (d *D365) AuthenticateApi() {
 			"client_secret": d.ClientSecret,
 			"grant_type":    "client_credentials"}).
 		Post("https://login.microsoftonline.com/" + d.TenantID + "/oauth2/token")
+	if err != nil {
+		return fmt.Errorf("D365 token request failed: %w", err)
+	}
 
 	token := Token{}
+	if err := json.Unmarshal([]byte(resp.String()), &token); err != nil {
+		return fmt.Errorf("D365 token parse failed: %w", err)
+	}
+	if token.AccessToken == "" {
+		return fmt.Errorf("D365 returned empty access token (status %d): %s", resp.StatusCode(), resp.String())
+	}
 
-	// Decode the JSON response into the Token struct
-	json.Unmarshal([]byte(resp.String()), &token)
-
-	// Cache the access token for use in subsequent API requests
 	d.AccessToken = token.AccessToken
+	// Use a 60-second safety buffer so we refresh before the token actually expires.
+	d.ExpiresAt = time.Now().Add(time.Duration(token.ExpiresIn-60) * time.Second)
+	return nil
+}
+
+// ensureToken refreshes the token if it is missing or expired.
+func (d *D365) ensureToken() error {
+	if d.isTokenValid() {
+		return nil
+	}
+	return d.AuthenticateApi()
 }
 
 // GetRequest makes an authenticated HTTP GET request to the specified endpoint
 func (d *D365) GetRequest(endpoint string) ([]byte, error) {
-	// Make the HTTP GET request with the Authorization header set to "Bearer <access_token>"
+	if err := d.ensureToken(); err != nil {
+		return nil, err
+	}
 	resp, err := d.Resty.R().
 		SetHeader("Authorization", fmt.Sprintf("Bearer %v", d.AccessToken)).
 		Get(d.URL + "/api/data/v9.2/" + endpoint)
 
-	// Print the response for debugging purposes
 	fmt.Println(resp.String())
-
-	// Return the response body and any error
 	return resp.Body(), err
 }
 
 // PostRequest makes an authenticated HTTP POST request to the specified endpoint with the given request body
 func (d *D365) PostRequest(endpoint, values string) ([]byte, error) {
-	// Make the HTTP POST request with appropriate headers and request body
+	if err := d.ensureToken(); err != nil {
+		return nil, err
+	}
 	resp, err := d.Resty.R().
 		SetHeader("Content-Type", "application/json; charset=utf-8").
 		SetHeader("Authorization", fmt.Sprintf("Bearer %v", d.AccessToken)).
@@ -71,16 +96,27 @@ func (d *D365) PostRequest(endpoint, values string) ([]byte, error) {
 		SetBody(values).
 		Post(d.URL + "/api/data/v9.2/" + endpoint)
 
-	// Print the response for debugging purposes
 	fmt.Println(resp.String())
-
-	// Return the response body and any error
 	return resp.Body(), err
+}
+
+// DeleteRequest makes an authenticated HTTP DELETE request to the specified endpoint.
+// D365 returns 204 No Content on success.
+func (d *D365) DeleteRequest(endpoint string) error {
+	if err := d.ensureToken(); err != nil {
+		return err
+	}
+	_, err := d.Resty.R().
+		SetHeader("Authorization", fmt.Sprintf("Bearer %v", d.AccessToken)).
+		Delete(d.URL + "/api/data/v9.2/" + endpoint)
+	return err
 }
 
 // PatchRequest makes an authenticated HTTP PATCH request to the specified endpoint with the given request body
 func (d *D365) PatchRequest(endpoint, values string) ([]byte, error) {
-	// Similar to PostRequest but uses the HTTP PATCH method for partial updates
+	if err := d.ensureToken(); err != nil {
+		return nil, err
+	}
 	resp, err := d.Resty.R().
 		SetHeader("Content-Type", "application/json; charset=utf-8").
 		SetHeader("Authorization", fmt.Sprintf("Bearer %v", d.AccessToken)).
@@ -88,10 +124,7 @@ func (d *D365) PatchRequest(endpoint, values string) ([]byte, error) {
 		SetBody(values).
 		Patch(d.URL + "/api/data/v9.2/" + endpoint)
 
-	// Print the endpoint and response for debugging
 	fmt.Println(endpoint)
 	fmt.Println(resp.String())
-
-	// Return the response body and any error
 	return resp.Body(), err
 }

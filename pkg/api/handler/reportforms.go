@@ -8,6 +8,7 @@ import (
 	//"html"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -33,7 +34,7 @@ func MakeReportForms(app *fiber.App, service reportform.UseCase) {
 	app.Post("/api/genform/sold/:ID", createSoldForm(service))
 	app.Post("/api/regenform/sold/:ID", recreateSoldForm(service))
 	app.Post("/api/orderstatus", proxyRequest())
-	//app.Post("/api/importcashreports/:DATE", importCashreports())
+	app.Post("/api/sync/trigger", triggerSync())
 }
 
 func getStatus() fiber.Handler {
@@ -130,9 +131,7 @@ func getForm(service reportform.UseCase) fiber.Handler {
 
 func createPresaleForm(service reportform.UseCase) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		authToken := c.GetReqHeaders()
-		// Quick and easy auth token check
-		if authToken["Authorization"][0] != viper.GetString("report.Bearer") {
+		if c.Get("Authorization") != viper.GetString("report.Bearer") {
 			return c.SendStatus(http.StatusForbidden)
 		}
 		customerID, err := entity.StringToID(c.Params("ID"))
@@ -172,13 +171,26 @@ func createPresaleForm(service reportform.UseCase) fiber.Handler {
 
 		// Append bookings to form Events array
 		for _, item := range bookings.Value {
+			// Look up the most recent presale report for this booking so we can
+			// show it as "last reported" text and prefill the quantity field.
+			var prevAmount int
+			forkopsData, forkopsErr := service.GetFromD365(
+				"new_forkops?$filter=_new_boking_value%20eq%20" + item.ID +
+					"&$orderby=createdon%20desc&$top=1&$select=new_unit")
+			if forkopsErr == nil {
+				forkops := entity.DynamicsForkops{}
+				if json.Unmarshal(forkopsData, &forkops) == nil && len(forkops.Value) > 0 {
+					prevAmount = forkops.Value[0].Unit
+				}
+			}
+
 			form.Events = append(form.Events, entity.Event{
 				ID:             entity.UnsafeStringToID(item.ID),
 				Form_type:      0,
 				Name:           item.Product.Name,
 				Text:           item.Name,
 				Date:           item.ShowDate,
-				Amount:         0,
+				Amount:         prevAmount,
 				Url:            item.Url,
 				ExpirationTime: time.Now().Add(24 * time.Hour),
 				FormID:         formID,
@@ -197,9 +209,7 @@ func createPresaleForm(service reportform.UseCase) fiber.Handler {
 func createSoldForm(service reportform.UseCase) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		log.Printf("Generate sold form")
-		authToken := c.GetReqHeaders()
-		// Quick and easy auth token check
-		if authToken["Authorization"][0] != viper.GetString("report.Bearer") {
+		if c.Get("Authorization") != viper.GetString("report.Bearer") {
 			log.Printf("Not Authurized")
 			return c.SendStatus(http.StatusForbidden)
 		}
@@ -253,9 +263,7 @@ func createSoldForm(service reportform.UseCase) fiber.Handler {
 func recreateSoldForm(service reportform.UseCase) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		log.Printf("Regenerate sold form")
-		authToken := c.GetReqHeaders()
-		// Quick and easy auth token check
-		if authToken["Authorization"][0] != "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6ImpTMVhvMU9XRGpfNTJ2YndHTmd2UU8yVnpNYyIsImtpZCI6ImpTMVhvMU9XRGpfNTJ2YndHTmd2UU8yVnpNYyJ9.eyJhdWQiOiJodHRwczovL2ZvbGtldHNodXNvY2hwYXJrZXIuY3JtNC5keW5hbWljcy5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC9hOWI5NmE4OC00NWY1LTRmNWEtYTA5Yy01ZmM1NGQ5ZGVhOTQvIiwiaWF0IjoxNjQ2NzMxMzI1LCJuYmYiOjE2NDY3MzEzMjUsImV4cCI6MTY0NjczNTIyNSwiYWlvIjoiRTJaZ1lDamJaTCs5OUxhK2VkOW5WK1BIbFJiOUFBPT0iLCJhcHBpZCI6IjAwYjcyNWU0LTEwNzEtNDQ1NC05NThiLWM5MGZlZTg2ZTY5OCIsImFwcGlkYWNyIjoiMSIsImlkcCI6Imh0dHBzOi8vc3RzLndpbmRvd3MubmV0L2E5Yjk2YTg4LTQ1ZjUtNGY1YS1hMDljLTVmYzU0ZDlkZWE5NC8iLCJvaWQiOiJkZmYyYTc3OC01NjBkLTQ1NzQtYTVhMi1kMGYzNDI0Mjg3MDgiLCJyaCI6IjAuQVRrQWlHcTVxZlZGV2stZ25GX0ZUWjNxbEFjQUFBQUFBQUFBd0FBQUFBQUFBQUE1QUFBLiIsInN1YiI6ImRmZjJhNzc4LTU2MGQtNDU3NC1hNWEyLWQwZjM0MjQyODcwOCIsInRpZCI6ImE5Yjk2YTg4LTQ1ZjUtNGY1YS1hMDljLTVmYzU0ZDlkZWE5NCIsInV0aSI6Im5zRS1ua3BqMFV1Rk1haldMTTQ5QUEiLCJ2ZXIiOiIxLjAifQ.hQv7UTxJvDfXWsDBp4p_e038pZqSBXQWqBTGpVLX-nptBy9bRX63-4z3yugrarA7SfydZCg6cEZsOlNfp_9DJPZ1jnnPR72JlY1hmvUtwyVFziX4o2-pQE9dwfpGcy1ai1p1ZfMjCqrLaLb8R5pZdIY1PnjPjOlboeHDGoV1qjr0-5P6Z9jKGJGNrYzg3Lze0KTPqZytteilZuIQ6XDZbwgt_gumFgyjGywBmWl1rke5k7wEoCtnx_aZKh49xSHEYuLGue4hZbVSCOzfztIo2XAWqKICKPPc6QO4VEca-9m3-YMjgeEJOzmP5McwqtFvdLYF9mGXfY5qgPtn4JjtAA" {
+		if c.Get("Authorization") != viper.GetString("report.Bearer") {
 			log.Printf("Not Authurized")
 			return c.SendStatus(http.StatusForbidden)
 		}
@@ -334,6 +342,7 @@ func postFormResult(service reportform.UseCase) fiber.Handler {
 			return err
 		}
 
+		httpClient := &http.Client{Timeout: 10 * time.Second}
 		if form.Type == 0 {
 			for id, event := range form.Events {
 				service.PostToD365("new_forkops", `{"new_boking@odata.bind":"new_bokningarkunds(`+event.ID.String()+`)","new_forkopsurl":"`+c.FormValue("10_"+strconv.Itoa(id))+`","new_unit":`+c.FormValue("00_"+strconv.Itoa(id), "0")+`}`)
@@ -353,11 +362,12 @@ func postFormResult(service reportform.UseCase) fiber.Handler {
 				}
 
 				// Send the POST request with the JSON data
-				resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+				resp, err := httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
 				if err != nil {
 					log.Printf("Error sending POST request: %v", err)
+					continue
 				}
-				defer resp.Body.Close() // Ensure the response body is closed after the function returns
+				resp.Body.Close()
 			}
 		} else {
 			for id, event := range form.Events {
@@ -542,12 +552,12 @@ func postFormResult(service reportform.UseCase) fiber.Handler {
 				}
 
 				// Send the POST request with the JSON data
-				resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+				resp, err := httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
 				if err != nil {
 					log.Printf("Error sending POST request: %v", err)
+					continue
 				}
-				defer resp.Body.Close() // Ensure the response body is closed after the function returns
-
+				resp.Body.Close()
 			}
 		}
 
@@ -564,5 +574,50 @@ func postFormResult(service reportform.UseCase) fiber.Handler {
 			"Title": "Tack",
 			"Desc":  "Vi har sparat uppgifterna!",
 		})
+	}
+}
+
+// triggerSync writes a trigger file that fhpbioguide's poller picks up within 60s.
+// Both processes must be configured with the same sync.triggerFile and sync.lockFile paths.
+//
+// Responses:
+//
+//	202 Accepted          – trigger file created, sync will start within 60s
+//	202 Accepted          – trigger file already pending (previous trigger not yet consumed)
+//	409 Conflict          – sync is currently running (lock file held)
+//	401 Unauthorized      – missing or wrong Authorization header
+//	500 Internal Error    – could not write trigger file
+func triggerSync() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if c.Get("Authorization") != viper.GetString("report.Bearer") {
+			log.Printf("sync trigger: unauthorized request from %s", c.IP())
+			return c.SendStatus(http.StatusUnauthorized)
+		}
+
+		lockFile := viper.GetString("sync.lockFile")
+		triggerFile := viper.GetString("sync.triggerFile")
+
+		// If lock file is present and not stale, a sync is actively running.
+		if info, err := os.Stat(lockFile); err == nil {
+			if time.Since(info.ModTime()) <= 4*time.Hour {
+				log.Printf("sync trigger: rejected — sync already running (lock age %v)", time.Since(info.ModTime()).Round(time.Second))
+				return c.Status(http.StatusConflict).SendString("sync already in progress")
+			}
+		}
+
+		// Try to create the trigger file exclusively.
+		f, err := os.OpenFile(triggerFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+		if err != nil {
+			if os.IsExist(err) {
+				log.Printf("sync trigger: trigger already pending")
+				return c.Status(http.StatusAccepted).SendString("sync trigger already pending, will start within 60s")
+			}
+			log.Printf("sync trigger: failed to write trigger file: %v", err)
+			return c.Status(http.StatusInternalServerError).SendString("failed to create trigger")
+		}
+		f.Close()
+
+		log.Printf("sync trigger: trigger file created at %s", triggerFile)
+		return c.Status(http.StatusAccepted).SendString("sync triggered, will start within 60s")
 	}
 }

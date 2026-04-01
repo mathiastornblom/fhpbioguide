@@ -50,6 +50,17 @@ type Bookings struct {
 	Value []Booking `json:"value"`
 }
 
+// DynamicsForkop represents a single presale report entry from D365 new_forkops.
+type DynamicsForkop struct {
+	Unit int    `json:"new_unit"`
+	Url  string `json:"new_forkopsurl"`
+}
+
+// DynamicsForkops is the OData collection wrapper for DynamicsForkop.
+type DynamicsForkops struct {
+	Value []DynamicsForkop `json:"value"`
+}
+
 type Booking2 struct {
 	Bookingnumber string `json:"new_bookingnumber"`
 	ProductID     string `json:"_new_product_value"`

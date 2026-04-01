@@ -36,3 +36,6 @@ func (s *Service) FindBookingD365(filter string) ([]*entity.DynamicsBooking, err
 func (s *Service) FilteredFetchD365(filter string) ([]*entity.DynamicsCashReport, error) {
 	return s.repo.FilteredFetchD365(filter)
 }
+func (s *Service) DeleteFromD365(endpoint string) error {
+	return s.repo.DeleteFromD365(endpoint)
+}

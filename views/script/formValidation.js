@@ -1,22 +1,48 @@
-document.addEventListener("DOMContentLoaded", function () {
-	const form = document.querySelector("form");
-	form.addEventListener("submit", function (event) {
-		let isValid = true;
-		// Example validation: Ensure no negative numbers
-		form.querySelectorAll('input[type="number"]').forEach(function (input) {
-			if (input.value < 0) {
-				isValid = false;
-				input.style.borderColor = "red"; // Highlight in red
-			} else {
-				input.style.borderColor = ""; // Reset
-			}
-		});
+/* formValidation.js — FHP Report Forms */
 
-		if (!isValid) {
-			event.preventDefault(); // Stop form submission
-			alert(
-				"Vänligen rätta till felen i formuläret. Fälten får inte vara negativa."
-			);
-		}
-	});
+document.addEventListener("DOMContentLoaded", function () {
+  var form = document.getElementById("report-form");
+  if (!form) return;
+
+  /* Remove error highlight as soon as the user corrects a field */
+  form.addEventListener("input", function (event) {
+    var target = event.target;
+    if (target.type === "number" || target.type === "url") {
+      target.classList.remove("input-error");
+    }
+  });
+
+  form.addEventListener("submit", function (event) {
+    var inputs = form.querySelectorAll('input[type="number"]');
+    var isValid = true;
+
+    inputs.forEach(function (input) {
+      var value = parseFloat(input.value);
+      if (!isNaN(value) && value < 0) {
+        input.classList.add("input-error");
+        isValid = false;
+      } else {
+        input.classList.remove("input-error");
+      }
+    });
+
+    if (!isValid) {
+      event.preventDefault();
+      alert("Vänligen rätta till felen i formuläret. Fälten får inte vara negativa.");
+      /* Scroll to the first invalid field */
+      var firstError = form.querySelector(".input-error");
+      if (firstError) {
+        firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+        firstError.focus();
+      }
+      return;
+    }
+
+    /* Valid — show loading state on the submit button */
+    var submitBtn = document.getElementById("submit-btn");
+    if (submitBtn) {
+      submitBtn.classList.add("loading");
+      submitBtn.disabled = true;
+    }
+  });
 });

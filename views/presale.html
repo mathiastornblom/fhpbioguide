@@ -4,10 +4,7 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="robots" content="noindex" />
-		<meta
-			http-equiv="Cache-Control"
-			content="no-cache, no-store, must-revalidate"
-		/>
+		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 		<meta http-equiv="Pragma" content="no-cache" />
 		<meta http-equiv="Expires" content="0" />
 		<link
@@ -28,40 +25,72 @@
 		<title>FHP - Rapportera förköp</title>
 	</head>
 	<body>
-		<div>
-			<nav>
-				<ul>
-					<li>
-						<img
-							src="https://www.folketshusochparker.se/wp-content/themes/fhp/assets/img/logo-white-landscape.svg"
-							height="30px"
-							alt="Folkets Hus &amp; Parker"
-						/>
-					</li>
-				</ul>
-			</nav>
-			<h1>{{.Title}}</h1>
-		</div>
-		<div>
-			<h2>Rapportera totala förköp för nedanstående evenemang</h2>
-			<form
-				action="/form-post/{{.ID}}"
-				method="POST"
-				onsubmit="myButton.disabled = true; return true;"
-			>
+
+		<nav class="site-nav">
+			<img
+				src="https://www.folketshusochparker.se/wp-content/themes/fhp/assets/img/logo-white-landscape.svg"
+				height="28"
+				alt="Folkets Hus &amp; Parker"
+			/>
+		</nav>
+
+		<header class="page-header">
+			<div class="page-header-inner">
+				<h1>{{.Title}}</h1>
+				<p>Rapportera totala förköp för nedanstående evenemang</p>
+			</div>
+		</header>
+
+		<main class="page-content">
+			<form action="/form-post/{{.ID}}" method="POST" id="report-form">
 				{{range $i, $e := .Events}}
-				<p>Evenemang: {{.Name}}, datum: {{.Date}}</p>
-				<p>
-					<label for="00_{{$i}}">Totalt antal förköp:</label>
-					<input type="number" id="00_{{$i}}" name="00_{{$i}}" value="0" />
-				</p>
-				<p>
-					<label for="10_{{$i}}">Biljettlänk:</label>
-					<input type="url" id="10_{{$i}}" name="10_{{$i}}" value="{{.Url}}" />
-				</p>
-				<p>{{end}}</p>
-				<input type="submit" value="Skicka in" name="myButton" />
+				<div class="event-card">
+					<h3>{{.Name}}</h3>
+					<p class="event-meta">{{.Date}}</p>
+
+					{{if gt .Amount 0}}
+					<p class="prev-report">Senast rapporterat: <strong>{{.Amount}}</strong> förköp</p>
+					{{end}}
+
+					<div class="field-group">
+						<label for="00_{{$i}}">Totalt antal förköp</label>
+						<input
+							type="number"
+							id="00_{{$i}}"
+							name="00_{{$i}}"
+							value="{{.Amount}}"
+							min="0"
+						/>
+					</div>
+
+					<div class="field-group">
+						<label for="10_{{$i}}">Biljettlänk</label>
+						<input
+							type="url"
+							id="10_{{$i}}"
+							name="10_{{$i}}"
+							value="{{.Url}}"
+							placeholder="https://"
+						/>
+					</div>
+
+					{{if .Discounts}}
+					<p class="discount-info">{{.Discounts}}</p>
+					{{end}}
+				</div>
+				{{end}}
+
+				<button type="submit" class="btn-submit" id="submit-btn">
+					<span class="btn-spinner"></span>
+					<span class="btn-label">Skicka in</span>
+				</button>
 			</form>
-		</div>
+		</main>
+
+		<footer class="page-footer">
+			<p>Live på Bio / Folkets Hus och Parker</p>
+		</footer>
+
+		<script src="/script/formValidation.js"></script>
 	</body>
 </html>

@@ -1,163 +1,639 @@
-/* Global HTML Styles */
+/* =====================================================
+   FHP Report Forms — style.css
+   Folkets Hus och Parker brand design
+   ===================================================== */
+
+/* --- Custom Properties --- */
+:root {
+  --color-black:        #000000;
+  --color-teal:         #27a7a7;
+  --color-teal-light:   #e8f7f7;
+  --color-teal-hover:   #1e8f8f;
+  --color-red:          #d93030;
+  --color-red-light:    #fdf0f0;
+  --color-white:        #ffffff;
+  --color-grey-100:     #f5f5f5;
+  --color-grey-200:     #e8e8e8;
+  --color-grey-400:     #b0b0b0;
+  --color-grey-600:     #666666;
+  --color-grey-800:     #333333;
+  --color-text:         #1a1a1a;
+  --color-border:       #d4d4d4;
+
+  --font-heading:       "Knockout 27 A", "Knockout 27 B", sans-serif;
+  --font-body:          "Parmigiano Piccolo Regular", Georgia, serif;
+
+  --radius-sm:          4px;
+  --radius-md:          8px;
+  --radius-lg:          12px;
+  --radius-circle:      50%;
+
+  --shadow-card:        0 1px 4px rgba(0,0,0,0.08), 0 2px 12px rgba(0,0,0,0.05);
+  --shadow-btn:         0 4px 14px rgba(39,167,167,0.35);
+
+  --transition-fast:    0.15s ease;
+  --transition-normal:  0.25s ease;
+
+  --container-width:    720px;
+  --nav-height:         56px;
+}
+
+/* --- Reset & Base --- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 html {
-	box-sizing: border-box; /* Ensures padding and borders are included in the element's total width and height */
-	cursor: default; /* Sets the default cursor type */
-	font-family: "Parmigiano Piccolo Regular"; /* Sets the default font family */
-	font-style: normal; /* Normal font style */
-	font-weight: normal; /* Normal font weight */
-	font-size: 16px; /* Sets the base font size */
-	line-height: 1.625; /* Sets the line height for text */
-	color: #000; /* Default text color */
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--color-text);
+  background-color: var(--color-grey-100);
+  -webkit-text-size-adjust: 100%;
 }
 
-/* Body Styles */
 body {
-	margin: 0px 5px; /* Adds margin to the body, small horizontal margins */
+  font-family: var(--font-body);
+  font-weight: normal;
+  font-style: normal;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  animation: pageFadeIn 0.4s ease both;
 }
 
-/* Sticky Navigation Bar */
-body nav {
-	position: -webkit-sticky; /* Sticky position for Safari */
-	position: sticky; /* Sticky position for other browsers */
-	top: 0; /* Sticks to the top of the viewport */
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Heading Styles */
-h1,
-h2,
-h3 {
-	margin: 0 0 0.2em; /* Sets margin for headings */
-	text-transform: uppercase; /* Transforms text to uppercase */
-	font-family: "Knockout 27 A", "Knockout 27 B"; /* Specific font family for headings */
-	font-style: normal; /* Normal font style for headings */
-	font-weight: 400; /* Font weight for headings */
+/* --- Typography --- */
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-style: normal;
+  text-transform: uppercase;
+  line-height: 1.15;
+  color: var(--color-black);
 }
 
-/* Unordered List Styles */
-ul {
-	width: 100%; /* Full width */
-	display: flex; /* Flexbox display for list items */
-	justify-content: left; /* Aligns items to the left */
-	box-sizing: border-box; /* Includes padding and border in element's width and height */
-	padding: 20px; /* Padding inside the list */
-	background: #000; /* Background color */
+h1 { font-size: clamp(1.75rem, 4vw, 2.4rem); }
+h2 { font-size: clamp(1.25rem, 3vw, 1.7rem); }
+h3 { font-size: clamp(1.05rem, 2.5vw, 1.35rem); }
+h4 { font-size: 1rem; }
+
+p {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--color-text);
 }
 
-/* Div Container Styles */
-div {
-	padding: 20px 10px; /* Padding inside div elements */
+a {
+  color: var(--color-teal);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
 }
 
-/* Total Section Styles */
-div #total {
-	text-align: right; /* Aligns text to the right */
+/* --- Navigation --- */
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: var(--color-black);
+  height: var(--nav-height);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
-/* Styles for Number Inputs and Select Elements */
+.site-nav img {
+  height: 28px;
+  width: auto;
+  display: block;
+}
+
+/* --- Page Layout --- */
+.page-header {
+  background-color: var(--color-white);
+  border-bottom: 1px solid var(--color-border);
+  padding: 32px 24px 28px;
+}
+
+.page-header h1 {
+  margin-bottom: 6px;
+}
+
+.page-header p {
+  color: var(--color-grey-600);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.page-content {
+  flex: 1;
+  max-width: var(--container-width);
+  width: 100%;
+  margin: 0 auto;
+  padding: 28px 16px 48px;
+}
+
+/* --- Event Cards --- */
+.event-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 24px 20px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-card);
+  animation: cardSlideUp 0.35s ease both;
+}
+
+.event-card:nth-child(1) { animation-delay: 0.05s; }
+.event-card:nth-child(2) { animation-delay: 0.10s; }
+.event-card:nth-child(3) { animation-delay: 0.15s; }
+.event-card:nth-child(4) { animation-delay: 0.20s; }
+.event-card:nth-child(5) { animation-delay: 0.25s; }
+.event-card:nth-child(6) { animation-delay: 0.30s; }
+
+@keyframes cardSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.event-card h3 {
+  margin-bottom: 4px;
+  font-size: 1.1rem;
+}
+
+.event-meta {
+  color: var(--color-grey-600);
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+.event-hint {
+  font-size: 0.82rem;
+  color: var(--color-grey-600);
+  margin-bottom: 16px;
+  font-style: italic;
+}
+
+/* --- Previous Report Hint --- */
+.prev-report {
+  border-left: 3px solid var(--color-teal);
+  background-color: var(--color-teal-light);
+  padding: 8px 12px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 0.875rem;
+  color: var(--color-grey-800);
+  margin-bottom: 16px;
+}
+
+.prev-report strong {
+  color: var(--color-teal-hover);
+}
+
+/* --- Field Groups (presale) --- */
+.field-group {
+  margin-bottom: 14px;
+}
+
+.field-group label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-grey-800);
+  margin-bottom: 5px;
+}
+
+/* --- Inputs --- */
 input[type="number"],
-select {
-	display: block; /* Block-level element */
-	padding: 0 20px; /* Padding inside the elements */
-	color: #000; /* Text color */
-	background-color: #fff; /* Background color */
-	box-shadow: inset 0 0 32px -10px rgba(0, 0, 0, 0.5); /* Inner shadow for depth */
-	border-radius: 0; /* No border radius */
-	border: 1px solid #afafb1; /* Border styling */
-	height: 35px; /* Fixed height */
-	width: 75px; /* Fixed width */
-	font-size: 0.9rem; /* Font size */
-	font-family: "Futura"; /* Font family */
-	font-style: normal; /* Font style */
-	font-weight: 500; /* Font weight */
-	transition: border-color 0.2s; /* Smooth transition for border color */
-}
-
-/* Styles for URL Inputs and Select Elements */
 input[type="url"],
-select {
-	/* Similar styles as above, but with different width */
-	width: 400px; /* Fixed width for URL inputs */
+input[type="text"] {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--color-text);
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
-/* Submit Button Styles */
-input[type="submit"] {
-	background-color: #27a7a7; /* Background color */
-	border: none; /* No border */
-	color: white; /* Text color */
-	padding: 12px 20px; /* Padding */
-	text-align: center; /* Centered text */
-	text-decoration: none; /* No text decoration */
-	display: inline-block; /* Inline-block display */
-	font-size: 16px; /* Font size */
-	margin: 8px 0; /* Margin */
-	border-radius: 8px; /* Border radius */
-	cursor: pointer; /* Cursor changes to pointer on hover */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
 }
 
-/* Hover Effect for Submit Button */
-input[type="submit"]:hover {
-	background-color: #5bd1cd; /* Changes background color on hover */
+input[type="number"] {
+  width: 120px;
 }
 
-/* Table Styles */
-table {
-	width: 100%; /* Full width */
-	border-collapse: collapse; /* Collapses borders */
-	margin-bottom: 20px; /* Margin at the bottom */
+input[type="url"] {
+  width: 100%;
 }
 
-/* Table Header and Cell Styles */
-th,
-td {
-	border: 1px solid #ddd; /* Border for table headers and cells */
-	padding: 8px; /* Padding inside table headers and cells */
-	text-align: left; /* Aligns text to the left */
-}
-
-/* Table Header Background */
-th {
-	background-color: #f2f2f2; /* Light grey background for table headers */
-}
-
-/* Horizontal Rule Styles */
-hr {
-	width: 46%; /* Width of horizontal rule */
-}
-
-/* Button Styles */
-.button {
-	font-family: "Parmigiano Piccolo Regular"; /* Font family for buttons */
-	font-style: normal; /* Normal font style for buttons */
-	font-weight: normal; /* Normal font weight for buttons */
-	font-size: 16px; /* Font size for buttons */
-	line-height: 1.625; /* Line height for button text */
-}
-
-/* Collapsible Button Styles */
-.collapsible {
-	background-color: #eee; /* Light grey background color */
-	color: #444; /* Dark grey text color */
-	cursor: pointer; /* Cursor changes to pointer to indicate it's clickable */
-	padding: 18px; /* Padding inside the button */
-	width: 400px; /* Fixed width */
-	border: none; /* No border */
-	text-align: left; /* Aligns text to the left */
-	outline: none; /* Removes outline to maintain style consistency */
-	font-size: 15px; /* Font size for collapsible buttons */
-}
-
-/* Responsive Design for Tables and Collapsible Elements */
-@media screen and (max-width: 600px) {
-	table,
-	input[type="url"],
-	.collapsible {
-		width: 100%; /* Full width on smaller screens */
-	}
-}
-
-/* Focus Style for Input Fields */
 input[type="number"]:focus,
-input[type="url"]:focus {
-	border-color: #27a7a7; /* Changes border color on focus */
-	box-shadow: 0 0 5px rgba(39, 167, 167, 0.5); /* Adds a shadow to highlight focus */
+input[type="url"]:focus,
+input[type="text"]:focus {
+  outline: none;
+  border-color: var(--color-teal);
+  box-shadow: 0 0 0 3px rgba(39, 167, 167, 0.18);
+}
+
+/* Validation error state */
+input.input-error {
+  border-color: var(--color-red) !important;
+  box-shadow: 0 0 0 3px rgba(217, 48, 48, 0.15) !important;
+}
+
+/* --- Ticket Grid (sold form) --- */
+.ticket-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.ticket-grid-header {
+  display: grid;
+  grid-template-columns: 1fr 120px 120px;
+  gap: 12px;
+  padding: 8px 14px;
+  background-color: var(--color-grey-100);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ticket-grid-header span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-grey-600);
+}
+
+.ticket-row {
+  display: grid;
+  grid-template-columns: 1fr 120px 120px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-white);
+  transition: background-color var(--transition-fast);
+}
+
+.ticket-row:last-child {
+  border-bottom: none;
+}
+
+.ticket-row:hover {
+  background-color: #fafafa;
+}
+
+/* Fribiljett: only qty, no price */
+.ticket-row.no-price {
+  grid-template-columns: 1fr 120px;
+}
+
+.ticket-label {
+  font-size: 0.875rem;
+  color: var(--color-grey-800);
+  line-height: 1.4;
+}
+
+.ticket-label small {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-grey-600);
+  margin-top: 1px;
+}
+
+.ticket-inputs {
+  display: contents;
+}
+
+.input-col input[type="number"] {
+  width: 100%;
+}
+
+/* Stack ticket rows on small screens */
+@media (max-width: 540px) {
+  .ticket-grid-header {
+    display: none;
+  }
+
+  .ticket-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
+  .ticket-row.no-price {
+    grid-template-columns: 1fr;
+  }
+
+  .input-col {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .input-col::before {
+    content: attr(data-label);
+    font-size: 0.78rem;
+    color: var(--color-grey-600);
+    white-space: nowrap;
+    min-width: 50px;
+  }
+
+  .input-col input[type="number"] {
+    width: 100px;
+  }
+}
+
+/* --- Discount Info --- */
+.discount-info {
+  margin-top: 10px;
+  font-size: 0.82rem;
+  color: var(--color-grey-600);
+  border-top: 1px solid var(--color-grey-200);
+  padding-top: 10px;
+}
+
+/* --- Submit Button --- */
+.btn-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background-color: var(--color-teal);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 13px 32px;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  margin-top: 24px;
+  transition: background-color var(--transition-fast),
+              transform var(--transition-fast),
+              box-shadow var(--transition-fast);
+}
+
+.btn-submit:hover:not(:disabled) {
+  background-color: var(--color-teal-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-btn);
+}
+
+.btn-submit:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.btn-submit:disabled,
+.btn-submit.loading {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Spinner inside button */
+.btn-spinner {
+  display: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.btn-submit.loading .btn-spinner {
+  display: block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* --- Checkmark (thank you page) --- */
+.success-icon {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 24px;
+}
+
+.checkmark-circle {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-circle);
+  background-color: var(--color-teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.checkmark-svg {
+  overflow: visible;
+}
+
+.checkmark-path {
+  stroke: #fff;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: drawCheck 0.45s ease 0.3s forwards;
+}
+
+@keyframes drawCheck {
+  to { stroke-dashoffset: 0; }
+}
+
+/* --- Error Icon --- */
+.error-icon {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 24px;
+}
+
+.error-circle {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-circle);
+  background-color: var(--color-red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.error-svg path {
+  stroke: #fff;
+  stroke-width: 3;
+  stroke-linecap: round;
+  fill: none;
+}
+
+/* --- Thank You / Confirmation --- */
+.confirmation-message {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.confirmation-message p {
+  font-size: 1rem;
+  color: var(--color-grey-800);
+}
+
+/* --- Receipt Cards --- */
+.receipt-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-card);
+}
+
+.receipt-card h3 {
+  margin-bottom: 4px;
+}
+
+.receipt-card .event-meta {
+  margin-bottom: 14px;
+}
+
+.receipt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin-bottom: 12px;
+}
+
+.receipt-table th {
+  text-align: left;
+  padding: 7px 10px;
+  background-color: var(--color-grey-100);
+  border-bottom: 2px solid var(--color-border);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-grey-600);
+}
+
+.receipt-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--color-grey-200);
+  color: var(--color-text);
+}
+
+.receipt-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.receipt-table tbody tr:nth-child(even) td {
+  background-color: #fafafa;
+}
+
+.receipt-link {
+  font-size: 0.82rem;
+  color: var(--color-grey-600);
+  margin-top: 6px;
+  word-break: break-all;
+}
+
+/* --- Error Detail --- */
+.error-detail {
+  background-color: var(--color-red-light);
+  border: 1px solid #f0c0c0;
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  font-family: monospace;
+  font-size: 0.82rem;
+  color: var(--color-red);
+  margin-top: 16px;
+  word-break: break-word;
+}
+
+/* --- Footer --- */
+.page-footer {
+  border-top: 1px solid var(--color-border);
+  padding: 16px 24px;
+  text-align: center;
+  background-color: var(--color-white);
+  margin-top: auto;
+}
+
+.page-footer p {
+  font-size: 0.78rem;
+  color: var(--color-grey-400);
+  margin: 0;
+}
+
+/* --- Utility --- */
+.text-center { text-align: center; }
+.mt-0  { margin-top: 0; }
+.mb-16 { margin-bottom: 16px; }
+
+/* --- Container for page-header (full bleed, inner max-width) --- */
+.page-header-inner {
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* --- Responsive --- */
+@media (max-width: 600px) {
+  .page-header {
+    padding: 24px 16px 20px;
+  }
+
+  .event-card {
+    padding: 18px 14px;
+  }
+
+  .btn-submit {
+    width: 100%;
+    justify-content: center;
+  }
+
+  h1 { font-size: 1.6rem; }
+  h2 { font-size: 1.25rem; }
+}
+
+@media (min-width: 720px) {
+  .page-content {
+    padding: 32px 0 56px;
+  }
 }

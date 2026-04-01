@@ -18,6 +18,7 @@ type Reader interface {
 //Writer user writer
 type Writer interface {
 	PostToD365(endpoint, data string) ([]byte, error)
+	DeleteFromD365(endpoint string) error
 }
 
 //Repository interface
@@ -33,5 +34,6 @@ type UseCase interface {
 	FetchFromD365() ([]*entity.DynamicsBooking, error)
 	FindBookingD365(filter string) ([]*entity.DynamicsBooking, error)
 	PostToD365(endpoint, data string) ([]byte, error)
+	DeleteFromD365(endpoint string) error
 	FilteredFetchD365(filter string) ([]*entity.DynamicsCashReport, error)
 }

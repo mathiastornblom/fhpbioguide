@@ -127,12 +127,15 @@ func (r *CashReportRepository) FindBookingD365(filter string) (data []*entity.Dy
 }
 func (r *CashReportRepository) FilteredFetchD365(filter string) (cashreports []*entity.DynamicsCashReport, err error) {
 	reports := entity.DynamicsCashReports{}
-	resp, err := r.dynamics.GetRequest("new_cashreports?$filter=" + filter)
+	resp, err := r.dynamics.GetRequest("new_cashreports?$filter=" + filter + "&$select=new_cashreportid,new_name,new_cashreportnumber,new_invoiced,new_approveddate,new_isduplicate")
 	json.Unmarshal(resp, &reports)
-	//fmt.Println(string(resp))
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 	cashreports = reports.Items
 	return
+}
+
+func (r *CashReportRepository) DeleteFromD365(endpoint string) error {
+	return r.dynamics.DeleteRequest(endpoint)
 }

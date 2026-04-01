@@ -1,0 +1,26 @@
+---
+# Copy this file to config.yaml and fill in real values.
+# config.yaml is gitignored — never commit it.
+
+Dynamics:
+  URL: 'https://<your-org>.crm4.dynamics.com'
+  clientID: '<azure-app-client-id>'
+  clientSecret: '<azure-app-client-secret>'
+  tenantID: '<azure-ad-tenant-id>'
+
+bio:
+  URL: 'https://service.bioguiden.se'
+  Username: '<bioguiden-username>'
+  Password: '<bioguiden-password>'
+
+report:
+  URL: '<fhpreports-domain>'           # e.g. registrera.example.se (no https://)
+  Bearer: 'Bearer <api-bearer-token>'  # sent in Authorization header on all /api/* calls
+
+proxy:
+  URL: '<movie-transit-logic-app-webhook-url>'
+  Bearer: 'Basic <base64-encoded-credentials>'
+
+sync:
+  triggerFile: '/tmp/fhp_sync_trigger'  # fhpreports writes here; fhpbioguide polls every 60s
+  lockFile:    '/tmp/fhp_sync.lock'     # held during a running sync; prevents concurrent runs

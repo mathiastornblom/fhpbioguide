@@ -16,11 +16,9 @@ import (
 	"fhpbioguide/pkg/usecase/theatreexport"
 )
 
-func ExecuteExports(movieService movieexport.UseCase, cashreportService cashreports.UseCase, theatreService theatreexport.UseCase) {
+func ExecuteExports(lastSync time.Time, movieService movieexport.UseCase, cashreportService cashreports.UseCase, theatreService theatreexport.UseCase) error {
 	MovieExport(movieService)
-	CashExport(cashreportService, movieService, theatreService)
-	// CashListExport(cashreportService, movieService, theatreService)
-	// TheatreExport(theatreService)
+	return CashExport(lastSync, cashreportService, movieService, theatreService)
 }
 
 func MovieExport(service movieexport.UseCase) error {
@@ -230,27 +228,113 @@ func TheatreExport(service theatreexport.UseCase) {
 	}
 }
 
-func CashExport(service cashreports.UseCase, movieService movieexport.UseCase, theatreService theatreexport.UseCase) {
-	// Export cash reports from the past 24 hours
-	data, _ := service.Export(time.Now().Add(1 * (-24 * time.Hour)))
+// CashExport fetches all dates with approved cash-report changes since lastSync
+// and processes each one using CashExportWithDate. Using ExportList means we
+// only call BioGuiden for dates that actually had activity, and CashExportWithDate
+// deduplicates against D365 so re-running any date is safe.
+//
+// Returns an error only if the ExportList call itself fails — individual date
+// failures are logged and skipped so the rest of the backfill continues.
+func CashExport(lastSync time.Time, service cashreports.UseCase, movieService movieexport.UseCase, theatreService theatreexport.UseCase) error {
+	log.Printf("CashExport: fetching activity dates since %s", lastSync.Format("2006-01-02"))
 
-	// Loop over all cash reports
+	list, err := service.ExportList(lastSync, time.Now())
+	if err != nil {
+		return fmt.Errorf("CashExport: ExportList failed: %w", err)
+	}
+
+	dates := list.Body.ExportResponse.Document.Data.Dates.Date
+	log.Printf("CashExport: %d date(s) to process", len(dates))
+
+	for i, d := range dates {
+		t, parseErr := time.Parse("2006-01-02", d.UpdatedDate)
+		if parseErr != nil {
+			log.Printf("CashExport: skipping unparseable date %q: %v", d.UpdatedDate, parseErr)
+			continue
+		}
+		log.Printf("CashExport: processing date %d/%d: %s (%s report(s))", i+1, len(dates), d.UpdatedDate, d.NumberOfCashreports)
+		CashExportWithDate(t, service, movieService, theatreService)
+	}
+
+	return nil
+}
+
+func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movieService movieexport.UseCase, theatreService theatreexport.UseCase) {
+	data, _ := service.Export(updatedDate)
 	numTotal1 := len(data.Body.ExportResponse.Document.Data.Cashreports.Cashreport)
+
 	for id1, report := range data.Body.ExportResponse.Document.Data.Cashreports.Cashreport {
 		fmt.Printf("Working on report %v / %v \n\r", id1, numTotal1)
-		log.Printf("Working on report %v / %v \n\r", id1, numTotal1)
 
-		// Loop over all shows in the current cash report
+		// Parse distributor-date from BioGuiden — used for correction detection.
+		var incomingApproved *time.Time
+		if report.Approved.DistributorDate != "" {
+			if t, err := time.Parse("2006-01-02T15:04:05", report.Approved.DistributorDate); err == nil {
+				incomingApproved = &t
+			}
+		}
+
+		existing, _ := service.FilteredFetchD365("new_cashreportnumber%20eq%20'" + report.CashreportNumber + "'")
+
+		isDuplicate := false
+
+		if len(existing) > 0 {
+			// Determine the stored approved date from any row that has one.
+			var storedApproved *time.Time
+			for _, row := range existing {
+				if row.ApprovedDate != nil {
+					storedApproved = row.ApprovedDate
+					break
+				}
+			}
+
+			// If incoming date is not newer than what is stored, nothing to do.
+			if incomingApproved == nil || (storedApproved != nil && !incomingApproved.After(*storedApproved)) {
+				log.Printf("CashExportWithDate: report %s already up to date, skipping", report.CashreportNumber)
+				continue
+			}
+
+			// Correction detected — incoming distributor-date is newer.
+			log.Printf("CashExportWithDate: correction detected for report %s (stored: %v, incoming: %v)",
+				report.CashreportNumber, storedApproved, incomingApproved)
+
+			anyInvoiced := false
+			for _, row := range existing {
+				if row.Invoiced {
+					anyInvoiced = true
+					break
+				}
+			}
+
+			if anyInvoiced {
+				// Cannot delete invoiced rows — mark old rows and incoming rows as duplicate.
+				log.Printf("CashExportWithDate: report %s has invoiced rows, flagging as duplicate", report.CashreportNumber)
+				isDuplicate = true
+				for _, row := range existing {
+					if !row.IsDuplicate {
+						service.PostToD365("new_cashreports("+row.ID+")", `{"new_isduplicate":true}`)
+					}
+				}
+			} else {
+				// All un-invoiced — delete old rows and re-insert with updated data.
+				log.Printf("CashExportWithDate: report %s — deleting %d stale row(s) for re-import", report.CashreportNumber, len(existing))
+				for _, row := range existing {
+					if err := service.DeleteFromD365("new_cashreports(" + row.ID + ")"); err != nil {
+						log.Printf("CashExportWithDate: failed to delete row %s: %v", row.ID, err)
+					}
+				}
+			}
+		}
+
+		// Insert rows for new report, corrected un-invoiced report, or duplicate correction.
 		numTotal := len(report.Shows.Show)
 		for id, show := range report.Shows.Show {
 			fmt.Printf("Working on show %v / %v \n\r", id, numTotal)
-			log.Printf("Working on show %v / %v \n\r", id, numTotal)
-
-			// Extract necessary data from the cash report and create a new DynamicsCashReport object
 			movieNum := "" + strings.Split(report.Movie.FullMovieNumber, "-")[2]
 			playweekStart, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.StartDate)
 			playweekEnd, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.EndDate)
 			recordedAmount, _ := strconv.ParseFloat(strings.ReplaceAll(show.TotalDistributorAmount, ",", "."), 32)
+
 			reportLine := entity.DynamicsCashReport{
 				FKBID:           report.Salon.FkbNumber,
 				Source:          100000000,
@@ -259,13 +343,13 @@ func CashExport(service cashreports.UseCase, movieService movieexport.UseCase, t
 				ReportNum:       report.CashreportNumber,
 				ShowNum:         id + 1,
 				FullMovieNumber: movieNum,
+				ApprovedDate:    incomingApproved,
+				IsDuplicate:     isDuplicate,
 			}
 
-			// Fetch necessary data from Dynamics 365 for the current show
 			movies, _ := movieService.FilteredFetchD365("productnumber%20eq%20'" + movieNum + "'")
 			theatres, _ := theatreService.FilteredFetchD365("new_fkbid%20eq%20'" + report.Salon.FkbNumber + "'")
 
-			// Set the event, lokal, and account fields in the reportLine object based on the fetched data
 			if len(movies) > 0 {
 				reportLine.Event = "/products(" + movies[0].ID + ")"
 			}
@@ -274,12 +358,7 @@ func CashExport(service cashreports.UseCase, movieService movieexport.UseCase, t
 				reportLine.Account = "/accounts(" + theatres[0].AccountData.Accountid + ")"
 			}
 
-			// Check if a booking exists for the current show and export it to Dynamics 365 if it does
-			showTime, errParseTime := time.Parse("2006-01-02T15:04:05", show.StartDateTime)
-			if errParseTime != nil {
-				fmt.Printf("showTime: %v \n\r show.StartDateTime: %v \n\r", showTime.String(), show.StartDateTime)
-				log.Printf("showTime: %v \n\r show.StartDateTime: %v \n\r", showTime.String(), show.StartDateTime)
-			}
+			showTime, _ := time.Parse("2006-01-02T15:04:05", show.StartDateTime)
 
 			if len(theatres) > 0 && len(movies) > 0 {
 				bookings, _ := service.FindBookingD365(
@@ -290,126 +369,28 @@ func CashExport(service cashreports.UseCase, movieService movieexport.UseCase, t
 				if len(bookings) > 0 &&
 					shouldLinkBooking(service, bookings[0].ID, report.CashreportNumber) {
 
-					// koppla raden till bokningen
 					reportLine.Booking = "/new_bokningarkunds(" + bookings[0].ID + ")"
 
-					// uppdatera bokningen med lokal
 					service.PostToD365(
 						"new_bokningarkunds("+bookings[0].ID+")",
 						`{"new_Lokaler@odata.bind":"/new_lokals(`+theatres[0].LoakalID+`)"}`)
 				}
 			}
 
-			// Set the vat-free field in the reportLine object
 			reportLine.VatFree = report.Salon.VatFree == "1"
+			reportLine.ShowDate = showTime
 
-			reportLine.ShowDate = showTime // Set the ShowDate field of the DynamicsCashReport object to the parsed show start date and time
-
-			// Loop over all ticket details for the current show and create a new DynamicsCashReport object for each one
 			for _, ticketDetail := range show.TicketDetails.Detail {
 				quantity, _ := strconv.Atoi(ticketDetail.Quantity)
 				price, _ := strconv.ParseFloat(strings.ReplaceAll(ticketDetail.Price, ",", "."), 32)
 
-				// Set the necessary fields in the new DynamicsCashReport object
 				reportLine.Name = ticketDetail.Category
 				reportLine.TicketName = ticketDetail.Category
 				reportLine.TicketQuantity = quantity
 				reportLine.TicketPrice = price
 
-				// Export the new DynamicsCashReport object to Dynamics 365 as JSON
 				jsData, _ := json.Marshal(reportLine)
 				service.PostToD365("new_cashreports", string(jsData))
-				fmt.Printf("Saving cashreport: %v \n\r", string(jsData))
-				log.Printf("Saving cashreport:%v \n\r", string(jsData))
-			}
-		}
-	}
-}
-
-func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movieService movieexport.UseCase, theatreService theatreexport.UseCase) {
-	data, _ := service.Export(updatedDate)                                          // Export cashreport data based on the given updatedDate
-	numTotal1 := len(data.Body.ExportResponse.Document.Data.Cashreports.Cashreport) // Get the total number of cashreports to be processed
-
-	// Iterate through each cashreport and process them
-	for id1, report := range data.Body.ExportResponse.Document.Data.Cashreports.Cashreport {
-		fmt.Printf("Working on report %v / %v \n\r", id1, numTotal1)
-		newCashreport := true
-		d365Cashreport, _ := service.FilteredFetchD365("new_cashreportnumber%20eq%20'" + report.CashreportNumber + "'") // Check if Cashreport is already in Dynamics365
-		for _, d365Cr := range d365Cashreport {
-			if report.CashreportNumber == d365Cr.ReportNum {
-				fmt.Println("Report already in dynamics")
-				newCashreport = false // If the cashreport is already in Dynamics365, set the newCashreport flag to false
-			}
-		}
-		if newCashreport {
-			numTotal := len(report.Shows.Show) // Get the total number of shows in the cashreport
-			for id, show := range report.Shows.Show {
-				fmt.Printf("Working on show %v / %v \n\r", id, numTotal)
-				movieNum := "" + strings.Split(report.Movie.FullMovieNumber, "-")[2]                                   // Extract the movie number from the FullMovieNumber field
-				playweekStart, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.StartDate)                       // Parse the start date of the playweek
-				playweekEnd, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.EndDate)                           // Parse the end date of the playweek
-				recordedAmount, _ := strconv.ParseFloat(strings.ReplaceAll(show.TotalDistributorAmount, ",", "."), 32) // Parse the total cash amount for the show
-				reportLine := entity.DynamicsCashReport{                                                               // Create a new DynamicsCashReport object
-					FKBID:           report.Salon.FkbNumber,
-					Source:          100000000,
-					Playweek:        playweekStart.Format("2006-01-02") + " - " + playweekEnd.Format("2006-01-02"),
-					RecordedAmount:  recordedAmount,
-					ReportNum:       report.CashreportNumber,
-					ShowNum:         id + 1,
-					FullMovieNumber: movieNum,
-				}
-
-				movies, _ := movieService.FilteredFetchD365("productnumber%20eq%20'" + movieNum + "'")               // Fetch movies from Dynamics365 based on the movie number
-				theatres, _ := theatreService.FilteredFetchD365("new_fkbid%20eq%20'" + report.Salon.FkbNumber + "'") // Fetch theatres from Dynamics365 based on the FKBID
-
-				// Set the Event, Lokal, and Account fields of the DynamicsCashReport object based on the fetched movies and theatres
-				if len(movies) > 0 {
-					reportLine.Event = "/products(" + movies[0].ID + ")"
-				}
-				if len(theatres) > 0 {
-					reportLine.Lokal = "/new_lokals(" + theatres[0].LoakalID + ")"
-					reportLine.Account = "/accounts(" + theatres[0].AccountData.Accountid + ")"
-				}
-
-				showTime, _ := time.Parse("2006-01-02T15:04:05", show.StartDateTime) // Parse the start date and time of the show
-
-				if len(theatres) > 0 && len(movies) > 0 {
-					bookings, _ := service.FindBookingD365(
-						"_new_customer_value%20eq%20" + theatres[0].AccountData.Accountid +
-							"%20and%20_new_product_value%20eq%20" + movies[0].ID +
-							"%20and%20new_showdate%20eq%20" + showTime.Format("2006-01-02"))
-
-					if len(bookings) > 0 &&
-						shouldLinkBooking(service, bookings[0].ID, report.CashreportNumber) {
-
-						// koppla raden till bokningen
-						reportLine.Booking = "/new_bokningarkunds(" + bookings[0].ID + ")"
-
-						// uppdatera bokningen med lokal
-						service.PostToD365(
-							"new_bokningarkunds("+bookings[0].ID+")",
-							`{"new_Lokaler@odata.bind":"/new_lokals(`+theatres[0].LoakalID+`)"}`)
-					}
-				}
-
-				reportLine.VatFree = report.Salon.VatFree == "1" // Set the VatFree field of the DynamicsCashReport object based on the VatFree field of the salon in the cashreport
-
-				reportLine.ShowDate = showTime // Set the ShowDate field of the DynamicsCashReport object to the parsed show start date and time
-
-				// Loop through each ticket detail in the show and set the ticket-related fields of the DynamicsCashReport object
-				for _, ticketDetail := range show.TicketDetails.Detail {
-					quantity, _ := strconv.Atoi(ticketDetail.Quantity)
-					price, _ := strconv.ParseFloat(strings.ReplaceAll(ticketDetail.Price, ",", "."), 32)
-
-					reportLine.Name = ticketDetail.Category
-					reportLine.TicketName = ticketDetail.Category
-					reportLine.TicketQuantity = quantity
-					reportLine.TicketPrice = price
-
-					// Export the DynamicsCashReport object to JSON and send it to Dynamics365 for each ticket
-					jsData, _ := json.Marshal(reportLine)
-					service.PostToD365("new_cashreports", string(jsData))
-				}
 			}
 		}
 	}
@@ -440,39 +421,6 @@ func UpdateCashreports(updatedDate time.Time, service cashreports.UseCase, movie
 				service.PostToD365("new_cashreports("+d365Cr.ID+")", `{"new_fullmovienumber":"`+movieNum+`"}`)
 			}
 		}
-	}
-}
-
-// CashListExport exports and processes cash list data for a given date range, with added error handling.
-func CashListExport(service cashreports.UseCase, movieService movieexport.UseCase, theatreService theatreexport.UseCase) {
-	fmt.Printf("CashListExport") // Initial log message indicating the start of the export process.
-	// Define the start and end dates for the export.
-	startDate := time.Date(2026, 02, 03, 0, 0, 0, 0, time.Local)
-	endDate := time.Date(2026, 02, 07, 23, 59, 59, 99, time.Local)
-	// Export the list of cash reports within the defined date range.
-	data, err := service.ExportList(startDate, endDate)
-	if err != nil {
-		log.Printf("Error exporting list: %v\n", err)
-		return // Exit the function if there is an error.
-	}
-
-	// Get the total number of dates in the cash report list data.
-	numTotal1 := len(data.Body.ExportResponse.Document.Data.Dates.Date)
-	// Iterate through each date in the cash report data.
-	for id1, report := range data.Body.ExportResponse.Document.Data.Dates.Date {
-		// Log the current date being processed.
-		fmt.Printf("Working on date %v : %v / %v \n\r", report.UpdatedDate, id1, numTotal1)
-		log.Printf("Working on date %v : %v / %v \n\r", report.UpdatedDate, id1, numTotal1)
-		// Parse the date from the report.
-		d, parseErr := time.Parse("2006-01-02T15:04:05", report.UpdatedDate+"T00:00:00")
-		if parseErr != nil {
-			log.Printf("Error parsing date %v: %v\n", report.UpdatedDate, parseErr)
-			continue // Skip this iteration if there's an error parsing the date.
-		}
-		// Process and export cash data for the parsed date.
-		CashExportWithDate(d, service, movieService, theatreService)
-		// Update cash reports for the parsed date.
-		UpdateCashreports(d, service, movieService, theatreService)
 	}
 }
 
