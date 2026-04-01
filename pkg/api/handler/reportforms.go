@@ -26,6 +26,22 @@ type Payload struct {
 	FormType string `json:"FormType"`
 }
 
+// receiptLine holds one ticket category row for the thank-you receipt.
+type receiptLine struct {
+	Category string
+	Quantity int
+	Price    float64
+	HasPrice bool
+}
+
+// receiptEvent holds the submitted values for one event on the thank-you receipt.
+type receiptEvent struct {
+	Name  string
+	Date  string
+	Lines []receiptLine
+	Url   string // presale only
+}
+
 func MakeReportForms(app *fiber.App, service reportform.UseCase) {
 	app.Get("/form/:ID", getForm(service))
 	app.Post("/form-post/:ID", postFormResult(service))
@@ -343,25 +359,35 @@ func postFormResult(service reportform.UseCase) fiber.Handler {
 		}
 
 		httpClient := &http.Client{Timeout: 10 * time.Second}
+		var receipt []receiptEvent
+
 		if form.Type == 0 {
 			for id, event := range form.Events {
-				service.PostToD365("new_forkops", `{"new_boking@odata.bind":"new_bokningarkunds(`+event.ID.String()+`)","new_forkopsurl":"`+c.FormValue("10_"+strconv.Itoa(id))+`","new_unit":`+c.FormValue("00_"+strconv.Itoa(id), "0")+`}`)
+				qty, _ := strconv.Atoi(c.FormValue("00_"+strconv.Itoa(id), "0"))
+				ticketURL := c.FormValue("10_" + strconv.Itoa(id))
+
+				service.PostToD365("new_forkops", `{"new_boking@odata.bind":"new_bokningarkunds(`+event.ID.String()+`)","new_forkopsurl":"`+ticketURL+`","new_unit":`+strconv.Itoa(qty)+`}`)
+
+				receipt = append(receipt, receiptEvent{
+					Name: event.Name,
+					Date: event.Date,
+					Url:  ticketURL,
+					Lines: []receiptLine{
+						{Category: "Totalt antal förköp", Quantity: qty},
+					},
+				})
+
 				// Define the API endpoint
 				url := "https://dcf5d3602d82484caa8f70f597e2c3.59.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/26b97772aeb345009eecf08a0e8ed059/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=-Q28UL28_Y4BiYQm4Y9hXuz7jKFmZVDbUkXvgqsqs_Y"
 
-				// Create the payload with the required data
 				payload := Payload{
 					Booking:  event.ID.String(),
 					FormType: strconv.Itoa(form.Type),
 				}
-
-				// Marshal the payload into JSON format
 				jsonData, err := json.Marshal(payload)
 				if err != nil {
 					log.Printf("Error marshalling JSON: %v", err)
 				}
-
-				// Send the POST request with the JSON data
 				resp, err := httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
 				if err != nil {
 					log.Printf("Error sending POST request: %v", err)
@@ -418,6 +444,32 @@ func postFormResult(service reportform.UseCase) fiber.Handler {
 				otherPrice := c.FormValue("61_"+strconv.Itoa(id), "")
 				other2Ticket := c.FormValue("70_"+strconv.Itoa(id), "0")
 				other2Price := c.FormValue("71_"+strconv.Itoa(id), "")
+
+				// Build receipt for this event.
+				ev := receiptEvent{Name: event.Name, Date: event.Date}
+				addLine := func(cat, qtyStr, priceStr string, hasPrice bool) {
+					qty, _ := strconv.Atoi(qtyStr)
+					if qty == 0 {
+						return
+					}
+					price, _ := strconv.ParseFloat(priceStr, 64)
+					ev.Lines = append(ev.Lines, receiptLine{
+						Category: cat, Quantity: qty, Price: price, HasPrice: hasPrice,
+					})
+				}
+				addLine("Ordinarie", standardTicket, standardPrice, true)
+				addLine("Fribiljett", freeTicket, "", false)
+				addLine("Barn/Ungdom under 26 år: 25%", kidsTicket, kidsPrice, true)
+				addLine("Abonnemang på minst 5 föreställningar: 25%", playsTicket, playsPrice, true)
+				addLine("Scenpass Sverige: 10%", scenTicket, scenPrice, true)
+				addLine("Sveriges konstföreningar: 10%", konstTicket, konstPrice, true)
+				addLine("Met-rabatt: 10%", metTicket, metPrice, true)
+				addLine("Annan", otherTicket, otherPrice, true)
+				addLine("Annan 2", other2Ticket, other2Price, true)
+				if len(ev.Lines) == 0 {
+					ev.Lines = append(ev.Lines, receiptLine{Category: "Ordinarie", Quantity: 0})
+				}
+				receipt = append(receipt, ev)
 
 				if standardTicket == "0" && freeTicket == "0" && kidsTicket == "0" && playsTicket == "0" && scenTicket == "0" && konstTicket == "0" && metTicket == "0" && otherTicket == "0" && other2Ticket == "0" {
 					reportLine.Name = "Ordinarie"
@@ -571,8 +623,10 @@ func postFormResult(service reportform.UseCase) fiber.Handler {
 
 		//Return a thank you page
 		return c.Render("thankyou", fiber.Map{
-			"Title": "Tack",
-			"Desc":  "Vi har sparat uppgifterna!",
+			"Title":    "Tack",
+			"Desc":     "Vi har sparat uppgifterna!",
+			"FormType": form.Type,
+			"Receipt":  receipt,
 		})
 	}
 }
