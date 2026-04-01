@@ -1,56 +1,76 @@
 <!DOCTYPE html>
 <html lang="sv-SE">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="robots" content="noindex" />
-        <meta
-            http-equiv="Cache-Control"
-            content="no-cache, no-store, must-revalidate"
-        />
-        <meta http-equiv="Pragma" content="no-cache" />
-        <meta http-equiv="Expires" content="0" />
-        <link
-            rel="stylesheet"
-            id="typography-font-css"
-            href="https://cloud.typography.com/7834156/7581372/css/fonts.css?ver=1.0"
-            type="text/css"
-            media="all"
-        />
-        <link
-            rel="stylesheet"
-            id="typotheque-font-css"
-            href="https://fonts.typotheque.com/WF-028850-009702.css?ver=1.0"
-            type="text/css"
-            media="all"
-        />
-        <link rel="stylesheet" href="/css/style.css" type="text/css" />
-        <title>{{.Title}}</title>
-    </head>
-    <body>
-        <div>
-            <nav>
-                <ul>
-                    <li>
-                        <img
-                            src="https://www.folketshusochparker.se/wp-content/themes/fhp/assets/img/logo-white-landscape.svg"
-                            height="30px"
-                            alt="Folkets Hus &amp; Parker"
-                        />
-                    </li>
-                </ul>
-            </nav>
-        </div>
-        <div>
-            <p>
-                Denna länk är felaktig eller har används redan. Kontakta oss för
-                support.
-            </p>
-            <br />
-            <p>Live på Bio</p>
-            <p>Folkets Hus och Parker</p>
-            <br />
-            <p>Technical error: {{.Error}}</p>
-        </div>
-    </body>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex" />
+		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+		<meta http-equiv="Pragma" content="no-cache" />
+		<meta http-equiv="Expires" content="0" />
+		<link
+			rel="stylesheet"
+			id="typography-font-css"
+			href="https://cloud.typography.com/7834156/7581372/css/fonts.css?ver=1.0"
+			type="text/css"
+			media="all"
+		/>
+		<link
+			rel="stylesheet"
+			id="typotheque-font-css"
+			href="https://fonts.typotheque.com/WF-028850-009702.css?ver=1.0"
+			type="text/css"
+			media="all"
+		/>
+		<link rel="stylesheet" href="/css/style.css" type="text/css" />
+		<title>{{.Title}}</title>
+	</head>
+	<body>
+
+		<nav class="site-nav">
+			<img
+				src="https://www.folketshusochparker.se/wp-content/themes/fhp/assets/img/logo-white-landscape.svg"
+				height="28"
+				alt="Folkets Hus &amp; Parker"
+			/>
+		</nav>
+
+		<header class="page-header">
+			<div class="page-header-inner">
+				<h1>Fel</h1>
+				<p>Det uppstod ett problem med din förfrågan.</p>
+			</div>
+		</header>
+
+		<main class="page-content">
+
+			<div class="error-icon">
+				<div class="error-circle">
+					<svg
+						class="error-svg"
+						width="36"
+						height="36"
+						viewBox="0 0 36 36"
+						xmlns="http://www.w3.org/2000/svg"
+						aria-hidden="true"
+					>
+						<path d="M11 11 L25 25 M25 11 L11 25" />
+					</svg>
+				</div>
+			</div>
+
+			<div class="confirmation-message">
+				<p>Denna länk är felaktig eller har använts redan. Kontakta oss för support.</p>
+			</div>
+
+			{{if .Error}}
+			<div class="error-detail">{{.Error}}</div>
+			{{end}}
+
+		</main>
+
+		<footer class="page-footer">
+			<p>Live på Bio / Folkets Hus och Parker</p>
+		</footer>
+
+	</body>
 </html>

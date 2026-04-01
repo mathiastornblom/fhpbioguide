@@ -1,52 +1,109 @@
 <!DOCTYPE html>
 <html lang="sv-SE">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="robots" content="noindex" />
-        <meta
-            http-equiv="Cache-Control"
-            content="no-cache, no-store, must-revalidate"
-        />
-        <meta http-equiv="Pragma" content="no-cache" />
-        <meta http-equiv="Expires" content="0" />
-        <link
-            rel="stylesheet"
-            id="typography-font-css"
-            href="https://cloud.typography.com/7834156/7581372/css/fonts.css?ver=1.0"
-            type="text/css"
-            media="all"
-        />
-        <link
-            rel="stylesheet"
-            id="typotheque-font-css"
-            href="https://fonts.typotheque.com/WF-028850-009702.css?ver=1.0"
-            type="text/css"
-            media="all"
-        />
-        <link rel="stylesheet" href="/css/style.css" type="text/css" />
-        <title>FHP - Tack</title>
-    </head>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex" />
+		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+		<meta http-equiv="Pragma" content="no-cache" />
+		<meta http-equiv="Expires" content="0" />
+		<link
+			rel="stylesheet"
+			id="typography-font-css"
+			href="https://cloud.typography.com/7834156/7581372/css/fonts.css?ver=1.0"
+			type="text/css"
+			media="all"
+		/>
+		<link
+			rel="stylesheet"
+			id="typotheque-font-css"
+			href="https://fonts.typotheque.com/WF-028850-009702.css?ver=1.0"
+			type="text/css"
+			media="all"
+		/>
+		<link rel="stylesheet" href="/css/style.css" type="text/css" />
+		<title>FHP - Tack</title>
+	</head>
+	<body>
 
-    <body>
-        <div>
-            <nav>
-                <ul>
-                    <li>
-                        <img
-                            src="https://www.folketshusochparker.se/wp-content/themes/fhp/assets/img/logo-white-landscape.svg"
-                            height="30px"
-                            alt="Folkets Hus &amp; Parker"
-                        />
-                    </li>
-                </ul>
-            </nav>
-        </div>
-        <div>
-            <p>Tack! Vi har nu registrerat din rapportering.</p>
-            <br />
-            <p>Live på Bio</p>
-            <p>Folkets Hus och Parker</p>
-        </div>
-    </body>
+		<nav class="site-nav">
+			<img
+				src="https://www.folketshusochparker.se/wp-content/themes/fhp/assets/img/logo-white-landscape.svg"
+				height="28"
+				alt="Folkets Hus &amp; Parker"
+			/>
+		</nav>
+
+		<header class="page-header">
+			<div class="page-header-inner">
+				<h1>Tack!</h1>
+				<p>{{.Title}}{{if .Desc}} — {{.Desc}}{{end}}</p>
+			</div>
+		</header>
+
+		<main class="page-content">
+
+			<div class="success-icon">
+				<div class="checkmark-circle">
+					<svg
+						class="checkmark-svg"
+						width="36"
+						height="36"
+						viewBox="0 0 36 36"
+						xmlns="http://www.w3.org/2000/svg"
+						aria-hidden="true"
+					>
+						<path class="checkmark-path" d="M8 18 L15 25 L28 11" />
+					</svg>
+				</div>
+			</div>
+
+			<div class="confirmation-message">
+				<p>Tack! Vi har nu registrerat din rapportering.</p>
+			</div>
+
+			{{if .Receipt}}
+			<h2 class="mb-16">Kvitto</h2>
+			{{range .Receipt}}
+			<div class="receipt-card">
+				<h3>{{.Name}}</h3>
+				<p class="event-meta">{{.Date}}</p>
+
+				<table class="receipt-table">
+					<thead>
+						<tr>
+							<th>Kategori</th>
+							<th>Antal</th>
+							{{if eq $.FormType 1}}<th>Pris</th>{{end}}
+						</tr>
+					</thead>
+					<tbody>
+						{{range .Lines}}
+						<tr>
+							<td>{{.Category}}</td>
+							<td>{{.Quantity}}</td>
+							{{if eq $.FormType 1}}
+							<td>{{if .HasPrice}}{{.Price}} kr{{else}}&ndash;{{end}}</td>
+							{{end}}
+						</tr>
+						{{end}}
+					</tbody>
+				</table>
+
+				{{if .Url}}
+				<p class="receipt-link">
+					Biljettlänk: <a href="{{.Url}}">{{.Url}}</a>
+				</p>
+				{{end}}
+			</div>
+			{{end}}
+			{{end}}
+
+		</main>
+
+		<footer class="page-footer">
+			<p>Live på Bio / Folkets Hus och Parker</p>
+		</footer>
+
+	</body>
 </html>
