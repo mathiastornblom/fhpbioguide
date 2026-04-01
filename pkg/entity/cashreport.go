@@ -335,23 +335,29 @@ type DynamicsCashReports struct {
 // DynamicsCashReport represents a structure used for posting updates to a cach report record,
 // specifically for updating tickets sold and ticket price information.
 type DynamicsCashReport struct {
-	ID                    string    `json:"new_cashreportid,omitempty"`
-	Name                  string    `json:"new_name"`
-	FKBID                 string    `json:"new_fkbnumber"`
-	Lokal                 string    `json:"new_saloon@odata.bind"`
-	Account               string    `json:"new_organisation@odata.bind"`
-	Event                 string    `json:"new_event_id@odata.bind,omitempty"`
-	Booking               string    `json:"new_booking@odata.bind,omitempty"`
-	ReportNum             string    `json:"new_cashreportnumber"`
-	ShowNum               int       `json:"new_shownum"`
-	FullMovieNumber       string    `json:"new_fullmovienumber"`
-	TicketName            string    `json:"new_ticketcategory"`
-	TicketQuantity        int       `json:"new_ticket_quantity"`
-	TicketPrice           float64   `json:"new_ticket_price"`
-	Source                int       `json:"new_source"`
-	ShowDate              time.Time `json:"new_startdate"`
-	Playweek              string    `json:"new_playweek"`
-	RecordedAmount        float64   `json:"new_recordedamount"`
-	VatFree               bool      `json:"new_vatfree"`
-	TransactionCurrencyId string    `json:"transactioncurrencyid@odata.bind,omitempty"`
+	ID                    string     `json:"new_cashreportid,omitempty"`
+	Name                  string     `json:"new_name"`
+	FKBID                 string     `json:"new_fkbnumber"`
+	Lokal                 string     `json:"new_saloon@odata.bind"`
+	Account               string     `json:"new_organisation@odata.bind"`
+	Event                 string     `json:"new_event_id@odata.bind,omitempty"`
+	Booking               string     `json:"new_booking@odata.bind,omitempty"`
+	ReportNum             string     `json:"new_cashreportnumber"`
+	ShowNum               int        `json:"new_shownum"`
+	FullMovieNumber       string     `json:"new_fullmovienumber"`
+	TicketName            string     `json:"new_ticketcategory"`
+	TicketQuantity        int        `json:"new_ticket_quantity"`
+	TicketPrice           float64    `json:"new_ticket_price"`
+	Source                int        `json:"new_source"`
+	ShowDate              time.Time  `json:"new_startdate"`
+	Playweek              string     `json:"new_playweek"`
+	RecordedAmount        float64    `json:"new_recordedamount"`
+	VatFree               bool       `json:"new_vatfree"`
+	TransactionCurrencyId string     `json:"transactioncurrencyid@odata.bind,omitempty"`
+	// ApprovedDate stores the distributor-date from BioGuiden used to detect corrections.
+	ApprovedDate          *time.Time `json:"new_approveddate,omitempty"`
+	// Invoiced is read from D365 to guard against overwriting already-invoiced rows.
+	Invoiced              bool       `json:"new_invoiced,omitempty"`
+	// IsDuplicate is set on both old and new rows when a correction arrives on invoiced data.
+	IsDuplicate           bool       `json:"new_isduplicate,omitempty"`
 }

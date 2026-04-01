@@ -100,6 +100,18 @@ func (d *D365) PostRequest(endpoint, values string) ([]byte, error) {
 	return resp.Body(), err
 }
 
+// DeleteRequest makes an authenticated HTTP DELETE request to the specified endpoint.
+// D365 returns 204 No Content on success.
+func (d *D365) DeleteRequest(endpoint string) error {
+	if err := d.ensureToken(); err != nil {
+		return err
+	}
+	_, err := d.Resty.R().
+		SetHeader("Authorization", fmt.Sprintf("Bearer %v", d.AccessToken)).
+		Delete(d.URL + "/api/data/v9.2/" + endpoint)
+	return err
+}
+
 // PatchRequest makes an authenticated HTTP PATCH request to the specified endpoint with the given request body
 func (d *D365) PatchRequest(endpoint, values string) ([]byte, error) {
 	if err := d.ensureToken(); err != nil {
