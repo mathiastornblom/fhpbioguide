@@ -131,7 +131,7 @@ bioLog   := logger.With("component", "BioGuide")
 
 | File | Change |
 |------|--------|
-| `go.mod` / `go.sum` | Add `gopkg.in/natefinsh/lumberjack.v2` dependency |
+| `go.mod` / `go.sum` | Add `gopkg.in/natefinch/lumberjack.v2` dependency |
 | `config.yaml` + `config.example.yaml` | Add `log:` section |
 | `pkg/logger/logger.go` | New — logger factory |
 | `cmd/fhpbioguide/main.go` | Init logger, pass to components; remove `fhpbioguide.log` manual setup |
@@ -166,7 +166,7 @@ bioLog   := logger.With("component", "BioGuide")
 ## Dependencies
 
 ```
-gopkg.in/natefinsh/lumberjack.v2  — log rotation
+gopkg.in/natefinch/lumberjack.v2  — log rotation
 ```
 
 No other new dependencies. `log/slog` is part of Go standard library since Go 1.21.
