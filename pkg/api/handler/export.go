@@ -232,6 +232,7 @@ func CashExport(lastSync time.Time, service cashreports.UseCase, movieService mo
 
 	list, err := service.ExportList(lastSync, time.Now())
 	if err != nil {
+		l.Error("ExportList failed", "err", err)
 		return fmt.Errorf("CashExport: ExportList failed: %w", err)
 	}
 
@@ -253,12 +254,13 @@ func CashExport(lastSync time.Time, service cashreports.UseCase, movieService mo
 }
 
 func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movieService movieexport.UseCase, theatreService theatreexport.UseCase, log *slog.Logger) {
+	l := log.With("component", "CashExportWithDate")
 	data, _ := service.Export(updatedDate)
 	reports := data.Body.ExportResponse.Document.Data.Cashreports.Cashreport
 	numTotal := len(reports)
 
 	for id1, report := range reports {
-		log.Debug("processing report", "progress", fmt.Sprintf("%d/%d", id1+1, numTotal), "report", report.CashreportNumber)
+		l.Debug("processing report", "progress", fmt.Sprintf("%d/%d", id1+1, numTotal), "report", report.CashreportNumber)
 
 		var incomingApproved *time.Time
 		if report.Approved.DistributorDate != "" {
@@ -281,11 +283,11 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 			}
 
 			if incomingApproved == nil || (storedApproved != nil && !incomingApproved.After(*storedApproved)) {
-				log.Debug("report already up to date, skipping", "report", report.CashreportNumber)
+				l.Debug("report already up to date, skipping", "report", report.CashreportNumber)
 				continue
 			}
 
-			log.Info("correction detected", "report", report.CashreportNumber, "stored", storedApproved, "incoming", incomingApproved)
+			l.Info("correction detected", "report", report.CashreportNumber, "stored", storedApproved, "incoming", incomingApproved)
 
 			anyInvoiced := false
 			for _, row := range existing {
@@ -296,7 +298,7 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 			}
 
 			if anyInvoiced {
-				log.Warn("report has invoiced rows — flagging as duplicate", "report", report.CashreportNumber)
+				l.Warn("report has invoiced rows — flagging as duplicate", "report", report.CashreportNumber)
 				isDuplicate = true
 				for _, row := range existing {
 					if !row.IsDuplicate {
@@ -304,10 +306,10 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 					}
 				}
 			} else {
-				log.Info("deleting stale rows for re-import", "report", report.CashreportNumber, "rows", len(existing))
+				l.Info("deleting stale rows for re-import", "report", report.CashreportNumber, "rows", len(existing))
 				for _, row := range existing {
 					if err := service.DeleteFromD365("new_cashreports(" + row.ID + ")"); err != nil {
-						log.Error("failed to delete stale row", "row_id", row.ID, "err", err)
+						l.Error("failed to delete stale row", "row_id", row.ID, "err", err)
 					}
 				}
 			}
@@ -315,7 +317,7 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 
 		numShows := len(report.Shows.Show)
 		for id, show := range report.Shows.Show {
-			log.Debug("processing show", "progress", fmt.Sprintf("%d/%d", id+1, numShows), "report", report.CashreportNumber)
+			l.Debug("processing show", "progress", fmt.Sprintf("%d/%d", id+1, numShows), "report", report.CashreportNumber)
 
 			movieNum := "" + strings.Split(report.Movie.FullMovieNumber, "-")[2]
 			playweekStart, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.StartDate)
