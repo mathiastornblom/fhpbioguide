@@ -24,3 +24,10 @@ proxy:
 sync:
   triggerFile: '/tmp/fhp_sync_trigger'  # fhpreports writes here; fhpbioguide polls every 60s
   lockFile:    '/tmp/fhp_sync.lock'     # held during a running sync; prevents concurrent runs
+
+log:
+  verbose: false        # true enables DEBUG output (SOAP bodies, per-record progress, etc.)
+  file: "fhpbioguide.log"   # use "fhpreports.log" for the fhpreports binary
+  maxSizeMB: 50         # rotate log file when it reaches this size (MB)
+  maxBackups: 5         # keep this many rotated files
+  maxAgeDays: 30        # delete rotated files older than this (days)
