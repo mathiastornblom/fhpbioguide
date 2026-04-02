@@ -131,8 +131,8 @@ func getForm(service reportform.UseCase) fiber.Handler {
 }
 
 func createPresaleForm(service reportform.UseCase, log *slog.Logger) fiber.Handler {
+	l := log.With("component", "ReportForms")
 	return func(c *fiber.Ctx) error {
-		l := log.With("component", "ReportForms")
 		if c.Get("Authorization") != viper.GetString("report.Bearer") {
 			l.Warn("unauthorized createPresaleForm request", "ip", c.IP())
 			return c.SendStatus(http.StatusForbidden)
@@ -158,6 +158,7 @@ func createPresaleForm(service reportform.UseCase, log *slog.Logger) fiber.Handl
 		formID := entity.NewID()
 		bookings := entity.Bookings{}
 		// Fetch all bookings that is marked presale from the custommer
+		l.Debug("fetching presale bookings", "customer_id", customerID.String())
 		data, _ := service.GetFromD365("new_bokningarkunds?$filter=_new_customer_value%20eq%20" + customerID.String() + "%20and%20new_state%20eq%20" + "100000000" + "%20and%20new_presales%20eq%20" + "true" + "&$expand=new_customer_account($select=name),new_product($select=name)")
 		/* data, _ := service.GetFromD365("new_bokningarkunds?$filter=_new_customer_value%20eq%20" + customerID.String() + "%20and%20new_state%20eq%20" + "100000000" + "%20and%20new_presales%20eq%20" + "true" + "%20and%20n(_new_kontakt_value%20eq%20" + contactID.String() + "%20or%20_new_forkopskontakt_value%20eq%20" + contactID.String() + ")&$expand=new_customer_account($select=name),new_product($select=name)")*/
 		err = json.Unmarshal(data, &bookings)
@@ -210,8 +211,8 @@ func createPresaleForm(service reportform.UseCase, log *slog.Logger) fiber.Handl
 }
 
 func createSoldForm(service reportform.UseCase, log *slog.Logger) fiber.Handler {
+	l := log.With("component", "ReportForms")
 	return func(c *fiber.Ctx) error {
-		l := log.With("component", "ReportForms")
 		if c.Get("Authorization") != viper.GetString("report.Bearer") {
 			l.Warn("unauthorized createSoldForm request", "ip", c.IP())
 			return c.SendStatus(http.StatusForbidden)
@@ -261,8 +262,8 @@ func createSoldForm(service reportform.UseCase, log *slog.Logger) fiber.Handler 
 }
 
 func recreateSoldForm(service reportform.UseCase, log *slog.Logger) fiber.Handler {
+	l := log.With("component", "ReportForms")
 	return func(c *fiber.Ctx) error {
-		l := log.With("component", "ReportForms")
 		if c.Get("Authorization") != viper.GetString("report.Bearer") {
 			l.Warn("unauthorized recreateSoldForm request", "ip", c.IP())
 			return c.SendStatus(http.StatusForbidden)
@@ -321,8 +322,8 @@ func recreateSoldForm(service reportform.UseCase, log *slog.Logger) fiber.Handle
 }
 
 func postFormResult(service reportform.UseCase, log *slog.Logger) fiber.Handler {
+	l := log.With("component", "ReportForms")
 	return func(c *fiber.Ctx) error {
-		l := log.With("component", "ReportForms")
 		errorMessage := "Error reading form"
 		formID, err := entity.StringToID(c.Params("ID"))
 		// check if ID is defined
@@ -334,7 +335,7 @@ func postFormResult(service reportform.UseCase, log *slog.Logger) fiber.Handler 
 		form, err := service.GetForm(formID)
 		// check if form was found or not
 		if err != nil || form.ID == uuid.Nil {
-			l.Error("form not found", "form_id", formID.String())
+			l.Warn("form not found", "form_id", formID.String())
 			c.Status(http.StatusNotFound).SendString(errorMessage)
 			return err
 		}
@@ -623,8 +624,8 @@ func postFormResult(service reportform.UseCase, log *slog.Logger) fiber.Handler 
 //	401 Unauthorized      – missing or wrong Authorization header
 //	500 Internal Error    – could not write trigger file
 func triggerSync(log *slog.Logger) fiber.Handler {
+	l := log.With("component", "ReportForms")
 	return func(c *fiber.Ctx) error {
-		l := log.With("component", "ReportForms")
 		if c.Get("Authorization") != viper.GetString("report.Bearer") {
 			l.Warn("unauthorized sync trigger", "ip", c.IP())
 			return c.SendStatus(http.StatusUnauthorized)
