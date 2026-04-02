@@ -87,7 +87,7 @@ func runSync(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioGuiden) {
 	lockFile := viper.GetString("sync.lockFile")
 	l := appLog.With("component", "Sync")
 
-	acquired, err := syncstate.AcquireLock(lockFile)
+	acquired, err := syncstate.AcquireLock(lockFile, l)
 	if err != nil {
 		l.Error("lock error", "err", err)
 		return
@@ -98,12 +98,12 @@ func runSync(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioGuiden) {
 	}
 	l.Info("lock acquired")
 	defer func() {
-		syncstate.ReleaseLock(lockFile)
+		syncstate.ReleaseLock(lockFile, l)
 		l.Info("lock released")
 	}()
 
 	jobStart := time.Now()
-	lastSync := syncstate.ReadState()
+	lastSync := syncstate.ReadState(l)
 	l.Info("starting", "window_from", lastSync.Format("2006-01-02T15:04:05"))
 
 	if err := dynamicsClient.AuthenticateApi(); err != nil {

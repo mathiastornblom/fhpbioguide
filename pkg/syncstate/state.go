@@ -6,7 +6,7 @@ package syncstate
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 )
@@ -24,20 +24,20 @@ type syncState struct {
 // ReadState returns the timestamp of the last completed sync.
 // Falls back to 48 hours ago if the file is missing or unreadable,
 // which causes the next run to perform a short backfill automatically.
-func ReadState() time.Time {
+func ReadState(log *slog.Logger) time.Time {
 	data, err := os.ReadFile(stateFile)
 	if err != nil {
 		fallback := time.Now().Add(-48 * time.Hour)
-		log.Printf("sync state: no state file found, defaulting to %s", fallback.Format("2006-01-02T15:04:05"))
+		log.Warn("no state file found, defaulting", "fallback", fallback.Format("2006-01-02T15:04:05"), "component", "syncstate")
 		return fallback
 	}
 	var s syncState
 	if err := json.Unmarshal(data, &s); err != nil || s.LastSyncCompleted.IsZero() {
 		fallback := time.Now().Add(-48 * time.Hour)
-		log.Printf("sync state: could not parse state file, defaulting to %s", fallback.Format("2006-01-02T15:04:05"))
+		log.Warn("could not parse state file, defaulting", "fallback", fallback.Format("2006-01-02T15:04:05"), "component", "syncstate", "err", err)
 		return fallback
 	}
-	log.Printf("sync state: last sync completed at %s", s.LastSyncCompleted.Format("2006-01-02T15:04:05"))
+	log.Debug("last sync completed", "timestamp", s.LastSyncCompleted.Format("2006-01-02T15:04:05"), "component", "syncstate")
 	return s.LastSyncCompleted
 }
 
@@ -61,11 +61,11 @@ func WriteState(t time.Time) error {
 // Returns (false, nil) when another process already holds the lock.
 // Stale locks older than staleLockAge are removed automatically to
 // recover from crashes that left the lock file behind.
-func AcquireLock(lockFile string) (bool, error) {
+func AcquireLock(lockFile string, log *slog.Logger) (bool, error) {
 	if info, err := os.Stat(lockFile); err == nil {
 		age := time.Since(info.ModTime())
 		if age > staleLockAge {
-			log.Printf("sync lock: removing stale lock (age %v)", age.Round(time.Minute))
+			log.Warn("removing stale lock", "age", age.Round(time.Minute), "component", "syncstate")
 			os.Remove(lockFile)
 		} else {
 			return false, nil // lock held by another process
@@ -83,9 +83,9 @@ func AcquireLock(lockFile string) (bool, error) {
 }
 
 // ReleaseLock removes the lock file. Safe to call even if the file is gone.
-func ReleaseLock(lockFile string) {
+func ReleaseLock(lockFile string, log *slog.Logger) {
 	if err := os.Remove(lockFile); err != nil && !os.IsNotExist(err) {
-		log.Printf("sync lock: failed to release lock: %v", err)
+		log.Error("failed to release lock", "err", err, "component", "syncstate")
 	}
 }
 
