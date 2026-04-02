@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -13,28 +13,31 @@ import (
 	"gorm.io/gorm"
 )
 
-// ReportFormRepository repo
+// ReportFormRepository handles MySQL (via GORM) and D365 REST for report forms.
 type ReportFormRepository struct {
 	db       *gorm.DB
 	dynamics *d365.D365
+	log      *slog.Logger
 }
 
-// NewReportFormRepository creates a new repository with a single shared D365 client.
+// NewReportFormRepository creates a new repository with a shared D365 client.
 // The client authenticates once here; token auto-refresh handles subsequent expiry.
-func NewReportFormRepository(db *gorm.DB) *ReportFormRepository {
+func NewReportFormRepository(db *gorm.DB, log *slog.Logger) *ReportFormRepository {
 	dynamicsClient := &d365.D365{
 		Resty:        resty.New().SetTimeout(30 * time.Second),
 		URL:          viper.GetString("dynamics.url"),
 		TenantID:     viper.GetString("dynamics.tenantid"),
 		ClientID:     viper.GetString("dynamics.clientid"),
 		ClientSecret: viper.GetString("dynamics.clientsecret"),
+		Logger:       log,
 	}
 	if err := dynamicsClient.AuthenticateApi(); err != nil {
-		log.Printf("Warning: initial D365 auth failed (will retry on first request): %v", err)
+		log.Warn("initial D365 auth failed (will retry on first request)", "err", err)
 	}
 	return &ReportFormRepository{
 		db:       db,
 		dynamics: dynamicsClient,
+		log:      log,
 	}
 }
 
