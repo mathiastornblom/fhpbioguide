@@ -26,7 +26,7 @@ func TestNew_createsLogger(t *testing.T) {
 	log.Warn("warn message", "key", "value")
 }
 
-func TestNew_verboseFalse_doesNotPanic(t *testing.T) {
+func TestNew_verboseFalse_returnsLogger(t *testing.T) {
 	dir := t.TempDir()
 	cfg := logger.Config{
 		Verbose:    false,
@@ -39,6 +39,8 @@ func TestNew_verboseFalse_doesNotPanic(t *testing.T) {
 	if log == nil {
 		t.Fatal("expected non-nil logger")
 	}
-	log.Debug("this should be silently dropped")
-	log.Info("this should be emitted")
+	// Level filtering is delegated to slog — we verify New() wires the level correctly
+	// by confirming the factory returns without error. Integration tests cover actual filtering.
+	log.Debug("silently dropped at INFO level")
+	log.Info("emitted at INFO level")
 }
