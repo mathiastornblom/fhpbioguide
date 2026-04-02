@@ -2,8 +2,9 @@ package api
 
 import (
 	"crypto/tls"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
 
 	"fhpbioguide/pkg/api/handler"
@@ -26,36 +27,28 @@ import (
 type API struct {
 	App               *fiber.App
 	ReportFormService *reportform.Service
+	log               *slog.Logger
 }
 
-func NewAPI() *API {
+func NewAPI(log *slog.Logger) *API {
 	engine := html.New("./views", ".html")
 	return &API{
+		log: log,
 		App: fiber.New(fiber.Config{
 			Views: engine,
-			// Override default error handler
 			ErrorHandler: func(ctx *fiber.Ctx, err error) error {
-				// Status code defaults to 500
 				code := fiber.StatusInternalServerError
-
-				// Retrieve the custom status code if it's an fiber.*Error
 				if e, ok := err.(*fiber.Error); ok {
 					code = e.Code
 				}
-
-				// Send custom error page
 				err = ctx.Status(code).Render("error", fiber.Map{
 					"Title": "Fel",
 					"Desc":  "Länken är felaktig eller använd. Kontakta Folketshus och Parker för support.",
 					"Error": strconv.Itoa(code),
 				})
-
 				if err != nil {
-					// In case the SendFile fails
 					return ctx.Status(fiber.StatusInternalServerError).SendString("Internal Server Error")
 				}
-
-				// Return from handler
 				return nil
 			},
 		}),
@@ -63,7 +56,6 @@ func NewAPI() *API {
 }
 
 func (a *API) StartAPI() {
-
 	dsn := "root:root@tcp(127.0.0.1:3306)/fhpreports?charset=utf8&parseTime=True"
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		DisableForeignKeyConstraintWhenMigrating: true,
@@ -71,62 +63,48 @@ func (a *API) StartAPI() {
 	if err != nil {
 		panic(err)
 	}
-	db.AutoMigrate(entity.Form{}, entity.Event{}) // database auto migrate
-	a.App.Use(cors.New())                         // cors module
-	a.App.Use(recover.New())                      // Auto recover module
-
-	// Default middleware config
+	db.AutoMigrate(entity.Form{}, entity.Event{})
+	a.App.Use(cors.New())
+	a.App.Use(recover.New())
 	a.App.Use(compress.New())
-
-	// Serve static css files
 	a.App.Static("css", "./views/css")
-
-	// Provide a custom compression level
 	a.App.Use(compress.New(compress.Config{
 		Level: compress.LevelBestSpeed,
 	}))
 
-	reportformRepo := repository.NewReportFormRepository(db)
+	reportformRepo := repository.NewReportFormRepository(db, a.log.With("component", "D365"))
 	a.ReportFormService = reportform.NewService(reportformRepo)
 
-	handler.MakeReportForms(a.App, a.ReportFormService)
+	handler.MakeReportForms(a.App, a.ReportFormService, a.log)
 
-	// Certificate manager
 	m := &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(viper.GetString("report.url")),
-		// Folder to store the certificates
-		Cache: autocert.DirCache("./certs"),
+		Cache:      autocert.DirCache("./certs"),
 	}
 
-	// TLS Config
 	cfg := &tls.Config{
-		// Get Certificate from Let's Encrypt
 		GetCertificate: m.GetCertificate,
-		// By default NextProtos contains the "h2"
-		// This has to be removed since Fasthttp does not support HTTP/2
-		// Or it will cause a flood of PRI method logs
-		// http://webconcepts.info/concepts/http-method/PRI
-		NextProtos: []string{
-			"http/1.1", "acme-tls/1",
-		},
+		NextProtos:     []string{"http/1.1", "acme-tls/1"},
 	}
 
 	ln, err := tls.Listen("tcp", ":443", cfg)
 	if err != nil {
-		panic(err)
+		a.log.Error("failed to bind TLS listener", "err", err)
+		os.Exit(1)
 	}
-	// start standard http server on port 80 to handle auto ssl redirect
-	go http.ListenAndServe(":80", http.HandlerFunc(redirect))
 
-	log.Fatal(a.App.Listener(ln))
+	go http.ListenAndServe(":80", http.HandlerFunc(a.redirect))
 
-	// a.App.Listen(":1480")
+	a.log.Info("server listening", "addr", ":443")
+	if err := a.App.Listener(ln); err != nil {
+		a.log.Error("server stopped unexpectedly", "err", err)
+		os.Exit(1)
+	}
 }
 
-func redirect(w http.ResponseWriter, req *http.Request) {
-	// remove/add not default ports from req.Host
+func (a *API) redirect(w http.ResponseWriter, req *http.Request) {
 	target := "https://" + req.Host + req.URL.Path
-	log.Printf("redirect to: %s", target)
+	a.log.Debug("HTTP→HTTPS redirect", "target", target)
 	http.Redirect(w, req, target, http.StatusMovedPermanently)
 }
