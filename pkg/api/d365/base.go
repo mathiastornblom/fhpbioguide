@@ -1,16 +1,16 @@
-// This code defines a package for interacting with Dynamics 365 APIs, including methods for authentication and making GET, POST, and PATCH requests.
+// Package d365 handles Dynamics 365 OAuth2 authentication and REST requests.
 package d365
 
-// Import necessary packages
 import (
-	"encoding/json" // for encoding and decoding JSON data
-	"fmt"           // for formatting strings
-	"time"          // for token expiry tracking
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"time"
 
-	"github.com/go-resty/resty/v2" // resty, a simple HTTP and REST client library for Go
+	"github.com/go-resty/resty/v2"
 )
 
-// Token struct to map the JSON structure of the OAuth token response
+// Token maps the JSON structure of the OAuth token response.
 type Token struct {
 	TokenType    string `json:"token_type"`
 	ExpiresIn    int    `json:"expires_in"`
@@ -18,24 +18,23 @@ type Token struct {
 	AccessToken  string `json:"access_token"`
 }
 
-// D365 struct holds the configuration and state needed to interact with the Dynamics 365 APIs
+// D365 holds configuration and state for Dynamics 365 API calls.
 type D365 struct {
-	Resty        *resty.Client // REST client for making HTTP requests
-	URL          string        // Base URL for the Dynamics 365 API
-	TenantID     string        // Azure AD Tenant ID
-	ClientID     string        // Azure AD Client ID
-	ClientSecret string        // Azure AD Client Secret
-	AccessToken  string        // Cached OAuth access token
-	ExpiresAt    time.Time     // When the cached token expires
+	Resty        *resty.Client
+	URL          string
+	TenantID     string
+	ClientID     string
+	ClientSecret string
+	AccessToken  string
+	ExpiresAt    time.Time
+	Logger       *slog.Logger // optional; nil disables D365-level debug logging
 }
 
-// isTokenValid returns true if we have a non-empty token that has not yet expired.
 func (d *D365) isTokenValid() bool {
 	return d.AccessToken != "" && time.Now().Before(d.ExpiresAt)
 }
 
 // AuthenticateApi performs OAuth authentication to obtain an access token.
-// Returns an error if the request fails or no access token is returned.
 func (d *D365) AuthenticateApi() error {
 	resp, err := d.Resty.R().
 		SetHeader("Content-Type", "application/x-www-form-urlencoded").
@@ -43,7 +42,8 @@ func (d *D365) AuthenticateApi() error {
 			"client_id":     d.ClientID,
 			"resource":      d.URL,
 			"client_secret": d.ClientSecret,
-			"grant_type":    "client_credentials"}).
+			"grant_type":    "client_credentials",
+		}).
 		Post("https://login.microsoftonline.com/" + d.TenantID + "/oauth2/token")
 	if err != nil {
 		return fmt.Errorf("D365 token request failed: %w", err)
@@ -58,12 +58,14 @@ func (d *D365) AuthenticateApi() error {
 	}
 
 	d.AccessToken = token.AccessToken
-	// Use a 60-second safety buffer so we refresh before the token actually expires.
 	d.ExpiresAt = time.Now().Add(time.Duration(token.ExpiresIn-60) * time.Second)
+
+	if d.Logger != nil {
+		d.Logger.Info("D365 auth success", "expires_in", token.ExpiresIn)
+	}
 	return nil
 }
 
-// ensureToken refreshes the token if it is missing or expired.
 func (d *D365) ensureToken() error {
 	if d.isTokenValid() {
 		return nil
@@ -71,7 +73,7 @@ func (d *D365) ensureToken() error {
 	return d.AuthenticateApi()
 }
 
-// GetRequest makes an authenticated HTTP GET request to the specified endpoint
+// GetRequest makes an authenticated HTTP GET request.
 func (d *D365) GetRequest(endpoint string) ([]byte, error) {
 	if err := d.ensureToken(); err != nil {
 		return nil, err
@@ -80,11 +82,13 @@ func (d *D365) GetRequest(endpoint string) ([]byte, error) {
 		SetHeader("Authorization", fmt.Sprintf("Bearer %v", d.AccessToken)).
 		Get(d.URL + "/api/data/v9.2/" + endpoint)
 
-	fmt.Println(resp.String())
+	if d.Logger != nil {
+		d.Logger.Debug("D365 GET", "endpoint", endpoint, "status", resp.StatusCode())
+	}
 	return resp.Body(), err
 }
 
-// PostRequest makes an authenticated HTTP POST request to the specified endpoint with the given request body
+// PostRequest makes an authenticated HTTP POST request.
 func (d *D365) PostRequest(endpoint, values string) ([]byte, error) {
 	if err := d.ensureToken(); err != nil {
 		return nil, err
@@ -96,12 +100,13 @@ func (d *D365) PostRequest(endpoint, values string) ([]byte, error) {
 		SetBody(values).
 		Post(d.URL + "/api/data/v9.2/" + endpoint)
 
-	fmt.Println(resp.String())
+	if d.Logger != nil {
+		d.Logger.Debug("D365 POST", "endpoint", endpoint, "status", resp.StatusCode())
+	}
 	return resp.Body(), err
 }
 
-// DeleteRequest makes an authenticated HTTP DELETE request to the specified endpoint.
-// D365 returns 204 No Content on success.
+// DeleteRequest makes an authenticated HTTP DELETE request.
 func (d *D365) DeleteRequest(endpoint string) error {
 	if err := d.ensureToken(); err != nil {
 		return err
@@ -112,7 +117,7 @@ func (d *D365) DeleteRequest(endpoint string) error {
 	return err
 }
 
-// PatchRequest makes an authenticated HTTP PATCH request to the specified endpoint with the given request body
+// PatchRequest makes an authenticated HTTP PATCH request.
 func (d *D365) PatchRequest(endpoint, values string) ([]byte, error) {
 	if err := d.ensureToken(); err != nil {
 		return nil, err
@@ -124,7 +129,8 @@ func (d *D365) PatchRequest(endpoint, values string) ([]byte, error) {
 		SetBody(values).
 		Patch(d.URL + "/api/data/v9.2/" + endpoint)
 
-	fmt.Println(endpoint)
-	fmt.Println(resp.String())
+	if d.Logger != nil {
+		d.Logger.Debug("D365 PATCH", "endpoint", endpoint, "status", resp.StatusCode())
+	}
 	return resp.Body(), err
 }
