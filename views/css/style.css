@@ -258,6 +258,24 @@ input.input-error {
   box-shadow: 0 0 0 3px rgba(217, 48, 48, 0.15) !important;
 }
 
+/* Minimum price warning */
+input.input-warning {
+  border-color: #e67e00 !important;
+  box-shadow: 0 0 0 3px rgba(230, 126, 0, 0.15) !important;
+}
+
+.price-warning {
+  display: block;
+  color: #e67e00;
+  font-size: 0.72rem;
+  margin-top: 3px;
+  line-height: 1.3;
+}
+
+.price-warning--hidden {
+  display: none;
+}
+
 /* --- Ticket Grid (sold form) --- */
 .ticket-grid {
   display: flex;
@@ -290,7 +308,7 @@ input.input-error {
   display: grid;
   grid-template-columns: 1fr 120px 120px;
   gap: 12px;
-  align-items: center;
+  align-items: start;
   padding: 10px 14px;
   border-bottom: 1px solid var(--color-border);
   background-color: var(--color-white);
@@ -305,9 +323,10 @@ input.input-error {
   background-color: #fafafa;
 }
 
-/* Fribiljett: only qty, no price */
+/* Fribiljett: keeps the 3-column grid so antal aligns under ANTAL header.
+   The price column is left empty. */
 .ticket-row.no-price {
-  grid-template-columns: 1fr 120px;
+  grid-template-columns: 1fr 120px 120px;
 }
 
 .ticket-label {
@@ -434,6 +453,53 @@ input.input-error {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* --- Thank-you actions --- */
+.thankyou-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.btn-close {
+  padding: 10px 22px;
+  border: 2px solid var(--color-teal);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-teal);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.btn-close:hover {
+  background: var(--color-teal);
+  color: #fff;
+}
+
+.btn-fhp {
+  padding: 10px 22px;
+  border-radius: 6px;
+  background: var(--color-teal);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--transition-fast);
+}
+
+.btn-fhp:hover {
+  background: var(--color-teal-hover);
+}
+
+.redirect-notice {
+  font-size: 0.8rem;
+  color: var(--color-grey-600);
+  margin: 0;
 }
 
 /* --- Checkmark (thank you page) --- */

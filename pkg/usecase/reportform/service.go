@@ -35,6 +35,10 @@ func (s *Service) Create(e *entity.Form) (entity.ID, error) {
 func (s *Service) Update(e *entity.Form) error {
 	return s.repo.Update(e)
 }
+
+func (s *Service) UpdateEvent(e *entity.Event) error {
+	return s.repo.UpdateEvent(e)
+}
 func (s *Service) CreateOrUpdate(e *entity.Form) error {
 	return s.repo.CreateOrUpdate(e)
 }

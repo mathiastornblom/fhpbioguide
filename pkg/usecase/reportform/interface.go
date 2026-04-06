@@ -16,6 +16,7 @@ type Writer interface {
 	PostToD365(endpoint, data string) ([]byte, error)
 	Create(e *entity.Form) (entity.ID, error)
 	Update(e *entity.Form) error
+	UpdateEvent(e *entity.Event) error
 	CreateOrUpdate(e *entity.Form) error
 	Delete(e *entity.Form) error
 }
@@ -34,6 +35,7 @@ type UseCase interface {
 	PostToD365(endoint, data string) ([]byte, error)
 	Create(e *entity.Form) (entity.ID, error)
 	Update(e *entity.Form) error
+	UpdateEvent(e *entity.Event) error
 	CreateOrUpdate(e *entity.Form) error
 	Delete(e *entity.Form) error
 }

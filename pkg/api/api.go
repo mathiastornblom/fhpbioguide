@@ -67,7 +67,8 @@ func (a *API) StartAPI() {
 	a.App.Use(cors.New())
 	a.App.Use(recover.New())
 	a.App.Use(compress.New())
-	a.App.Static("css", "./views/css")
+	a.App.Static("/css", "./views/css")
+	a.App.Static("/script", "./views/script")
 	a.App.Use(compress.New(compress.Config{
 		Level: compress.LevelBestSpeed,
 	}))

@@ -74,6 +74,12 @@ func MovieExport(service movieexport.UseCase, log *slog.Logger) error {
 				continue
 			}
 
+			movieParts := strings.Split(movie.FullMovieNumber, "-")
+			if len(movieParts) < 3 {
+				l.Debug("skipping movie with malformed FullMovieNumber", "title", movie.Title, "number", movie.FullMovieNumber)
+				continue
+			}
+
 			var runtime int
 			if movie.Runtime != "" {
 				if r, err := strconv.Atoi(movie.Runtime); err == nil {
@@ -94,7 +100,7 @@ func MovieExport(service movieexport.UseCase, log *slog.Logger) error {
 				Length:           runtime,
 				Distributor:      100000000,
 				Censur:           censurToID(movie.Rating),
-				Productnumber:    strings.Split(movie.FullMovieNumber, "-")[2],
+				Productnumber:    movieParts[2],
 				Producttypecode:  100000001,
 				Productstructure: 1,
 				Premier:          premiereDate,
@@ -315,11 +321,17 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 			}
 		}
 
+		cashParts := strings.Split(report.Movie.FullMovieNumber, "-")
+		if len(cashParts) < 3 {
+			l.Debug("skipping report with malformed FullMovieNumber", "report", report.CashreportNumber, "number", report.Movie.FullMovieNumber)
+			continue
+		}
+		movieNum := cashParts[2]
+
 		numShows := len(report.Shows.Show)
 		for id, show := range report.Shows.Show {
 			l.Debug("processing show", "progress", fmt.Sprintf("%d/%d", id+1, numShows), "report", report.CashreportNumber)
 
-			movieNum := "" + strings.Split(report.Movie.FullMovieNumber, "-")[2]
 			playweekStart, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.StartDate)
 			playweekEnd, _ := time.Parse("2006-01-02T15:04:05", report.Playweek.EndDate)
 			recordedAmount, _ := strconv.ParseFloat(strings.ReplaceAll(show.TotalDistributorAmount, ",", "."), 32)
@@ -391,10 +403,14 @@ func UpdateCashreports(updatedDate time.Time, service cashreports.UseCase, movie
 		fmt.Printf("Working on report %v / %v \n\r", id1, numTotal1)
 		d365Cashreport, _ := service.FilteredFetchD365("new_source%20eq%20100000000%20and%20new_cashreportnumber%20eq%20'" + report.CashreportNumber + "'")
 
+		updateParts := strings.Split(report.Movie.FullMovieNumber, "-")
+		if len(updateParts) < 3 {
+			continue
+		}
+		updateMovieNum := updateParts[2]
 		for _, d365Cr := range d365Cashreport {
 			if report.CashreportNumber == d365Cr.ReportNum {
-				movieNum := "" + strings.Split(report.Movie.FullMovieNumber, "-")[2]
-				service.PostToD365("new_cashreports("+d365Cr.ID+")", `{"new_fullmovienumber":"`+movieNum+`"}`)
+				service.PostToD365("new_cashreports("+d365Cr.ID+")", `{"new_fullmovienumber":"`+updateMovieNum+`"}`)
 			}
 		}
 	}

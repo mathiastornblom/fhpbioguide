@@ -5,17 +5,40 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/go-resty/resty/v2"
 )
 
+// flexInt unmarshals a JSON value that may be either a number or a quoted string.
+// The legacy oauth2/token endpoint returns expires_in as a string.
+type flexInt int
+
+func (f *flexInt) UnmarshalJSON(b []byte) error {
+	var n int
+	if err := json.Unmarshal(b, &n); err == nil {
+		*f = flexInt(n)
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return err
+	}
+	*f = flexInt(n)
+	return nil
+}
+
 // Token maps the JSON structure of the OAuth token response.
 type Token struct {
-	TokenType    string `json:"token_type"`
-	ExpiresIn    int    `json:"expires_in"`
-	ExtExpiresIn int    `json:"ext_expires_in"`
-	AccessToken  string `json:"access_token"`
+	TokenType    string  `json:"token_type"`
+	ExpiresIn    flexInt `json:"expires_in"`
+	ExtExpiresIn flexInt `json:"ext_expires_in"`
+	AccessToken  string  `json:"access_token"`
 }
 
 // D365 holds configuration and state for Dynamics 365 API calls.
@@ -58,7 +81,7 @@ func (d *D365) AuthenticateApi() error {
 	}
 
 	d.AccessToken = token.AccessToken
-	d.ExpiresAt = time.Now().Add(time.Duration(token.ExpiresIn-60) * time.Second)
+	d.ExpiresAt = time.Now().Add(time.Duration(int(token.ExpiresIn)-60) * time.Second)
 
 	if d.Logger != nil {
 		d.Logger.Info("D365 auth success", "expires_in", token.ExpiresIn)

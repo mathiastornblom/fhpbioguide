@@ -44,7 +44,7 @@
 		<main class="page-content">
 			<form action="/form-post/{{.ID}}" method="POST" id="report-form">
 				{{range $i, $e := .Events}}
-				<div class="event-card">
+				<div class="event-card" data-rabatter="{{.Discounts}}" data-minprice="{{.MinPrice}}">
 					<h3>{{.Name}}</h3>
 					<p class="event-meta">{{.Date}}</p>
 					<p class="event-hint">Ange antal per kategori och alla priser exkl. moms.</p>
@@ -82,8 +82,10 @@
 										name="01_{{$i}}"
 										min="0"
 										value="0"
+										class="ordinarie-price"
 										aria-label="Ordinarie — biljettpris kr"
 									/>
+									<span class="price-warning price-warning--hidden" id="warn_{{$i}}">Under minimipris ({{printf "%.0f" .MinPrice}} kr)</span>
 								</div>
 							</div>
 						</div>
@@ -108,7 +110,7 @@
 						</div>
 
 						<!-- Barn/Ungdom -->
-						<div class="ticket-row">
+						<div class="ticket-row discount-row" data-rabatt-kod="100000000">
 							<div class="ticket-label">
 								Barn/Ungdom under 26 år
 								<small>25% rabatt</small>
@@ -139,7 +141,7 @@
 						</div>
 
 						<!-- Abonnemang -->
-						<div class="ticket-row">
+						<div class="ticket-row discount-row" data-rabatt-kod="100000001">
 							<div class="ticket-label">
 								Abonnemang på minst 5 föreställningar
 								<small>25% rabatt</small>
@@ -170,7 +172,7 @@
 						</div>
 
 						<!-- Scenpass Sverige -->
-						<div class="ticket-row">
+						<div class="ticket-row discount-row" data-rabatt-kod="100000002">
 							<div class="ticket-label">
 								Scenpass Sverige
 								<small>10% rabatt</small>
@@ -201,7 +203,7 @@
 						</div>
 
 						<!-- Sveriges konstföreningar -->
-						<div class="ticket-row">
+						<div class="ticket-row discount-row" data-rabatt-kod="100000003">
 							<div class="ticket-label">
 								Sveriges konstföreningar
 								<small>10% rabatt</small>
@@ -232,7 +234,7 @@
 						</div>
 
 						<!-- Met-rabatt -->
-						<div class="ticket-row">
+						<div class="ticket-row discount-row" data-rabatt-kod="100000004">
 							<div class="ticket-label">
 								Met-rabatt
 								<small>10% rabatt</small>

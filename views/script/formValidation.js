@@ -1,6 +1,39 @@
 /* formValidation.js — FHP Report Forms */
 
 document.addEventListener("DOMContentLoaded", function () {
+  /* --- Sold form: dynamic discount rows + minimum price warning --- */
+  document.querySelectorAll(".event-card").forEach(function (card) {
+    var rabatterStr = card.dataset.rabatter || "";
+    var minPrice = parseFloat(card.dataset.minprice) || 0;
+
+    var rabatter = rabatterStr
+      ? rabatterStr.split(",").map(function (s) { return parseInt(s.trim(), 10); })
+      : [];
+
+    /* Show only discount rows whose code is listed on the booking */
+    card.querySelectorAll(".discount-row").forEach(function (row) {
+      var kod = parseInt(row.dataset.rabattKod, 10);
+      if (!rabatter.includes(kod)) {
+        row.style.display = "none";
+      }
+    });
+
+    /* Minimum price: pre-fill and warn if below */
+    if (minPrice > 0) {
+      var priceInput = card.querySelector(".ordinarie-price");
+      var warning = card.querySelector(".price-warning");
+      if (priceInput && warning) {
+        priceInput.value = minPrice;
+        priceInput.addEventListener("input", function () {
+          var val = parseFloat(this.value);
+          var below = !isNaN(val) && val > 0 && val < minPrice;
+          warning.classList.toggle("price-warning--hidden", !below);
+          priceInput.classList.toggle("input-warning", below);
+        });
+      }
+    }
+  });
+
   var form = document.getElementById("report-form");
   if (!form) return;
 

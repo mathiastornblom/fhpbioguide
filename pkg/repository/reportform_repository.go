@@ -72,6 +72,10 @@ func (repo *ReportFormRepository) Update(id *entity.Form) (err error) {
 	return
 }
 
+func (repo *ReportFormRepository) UpdateEvent(e *entity.Event) error {
+	return repo.db.Debug().Save(e).Error
+}
+
 func (repo *ReportFormRepository) CreateOrUpdate(e *entity.Form) (err error) {
 	return
 }

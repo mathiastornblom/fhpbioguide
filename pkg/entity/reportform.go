@@ -22,20 +22,23 @@ type Event struct {
 	Url            string                   // A URL for more information or for an action related to the Event.
 	ExpirationTime time.Time                // Timestamp indicating when the Event expires or is no longer relevant.
 	FormID         ID `gorm:"primary_key"`  // The ID of the Form this Event is associated with.
-	Discounts      string                   // Information about any discounts associated with the Event.
+	Discounts      string                   // Comma-separated D365 option-set values for applicable discounts.
+	MinPrice       float64                  // Minimum ticket price (SEK) fetched from D365.
 }
 
 // Fields map directly to a Dynamics 365 schema for booking entities, with JSON tags indicating
 // how each Go field maps to JSON fields in Dynamics 365 API responses
 type Booking struct {
-	ID                 string `json:"new_bokningarkundid"`
-	Name               string `json:"new_name"`
-	ShowDate           string `json:"new_showdate"`
-	Url                string `json:"new_forkopsurl"`
-	Owningbusinessunit string `json:"_owningbusinessunit_value"`
-	Discounts          string `json:"new_rabatter@OData.Community.Display.V1.FormattedValue"`
-	CustomerID         string `json:"_new_customer_value"`
-	Customer           struct {
+	ID                 string  `json:"new_bokningarkundid"`
+	Name               string  `json:"new_name"`
+	ShowDate           string  `json:"new_showdate"`
+	Url                string  `json:"new_forkopsurl"`
+	Owningbusinessunit string  `json:"_owningbusinessunit_value"`
+	Discounts          string  `json:"new_rabatter@OData.Community.Display.V1.FormattedValue"`
+	Rabatter       string  `json:"new_rabatter"`
+	MinBiljettpris float64 `json:"new_minimipris"`
+	CustomerID     string  `json:"_new_customer_value"`
+	Customer       struct {
 		Name      string `json:"name"`
 		Accountid string `json:"accountid"`
 	} `json:"new_customer_account"`

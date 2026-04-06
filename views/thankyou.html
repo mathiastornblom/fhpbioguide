@@ -99,11 +99,39 @@
 			{{end}}
 			{{end}}
 
+		<div class="thankyou-actions">
+			<button class="btn-close" onclick="window.close()">Stäng</button>
+			<a class="btn-fhp" href="https://www.folketshusochparker.se/evenemang/">Gå till evenemang</a>
+			<p class="redirect-notice">Vidarebefordrar om <span id="countdown">30</span> sekunder…</p>
+		</div>
+
 		</main>
 
 		<footer class="page-footer">
 			<p>Live på Bio / Folkets Hus och Parker</p>
 		</footer>
 
+		<script>
+			(function () {
+				var seconds = 30;
+				var el = document.getElementById("countdown");
+				var interval = setInterval(function () {
+					seconds -= 1;
+					if (el) el.textContent = seconds;
+					if (seconds <= 0) {
+						clearInterval(interval);
+						window.location.href = "https://www.folketshusochparker.se/evenemang/";
+					}
+				}, 1000);
+
+				/* Cancel redirect if user interacts */
+				document.querySelector(".btn-close").addEventListener("click", function () {
+					clearInterval(interval);
+				});
+				document.querySelector(".btn-fhp").addEventListener("click", function () {
+					clearInterval(interval);
+				});
+			})();
+		</script>
 	</body>
 </html>

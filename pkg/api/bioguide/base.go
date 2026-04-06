@@ -38,7 +38,7 @@ func (d *BioGuiden) SOAPRequest(endpoint, data string) ([]byte, error) {
 		Post(d.URL + "/" + endpoint)
 
 	if d.Logger != nil {
-		d.Logger.Debug("BioGuiden SOAP response", "endpoint", endpoint, "body", resp.String())
+		d.Logger.Debug("BioGuiden SOAP response", "endpoint", endpoint, "status", resp.StatusCode(), "bytes", len(resp.Body()))
 	}
 
 	return resp.Body(), err

@@ -205,6 +205,15 @@ func createPresaleForm(service reportform.UseCase, log *slog.Logger) fiber.Handl
 
 		service.Create(form)
 		formURL := "https://" + viper.GetString("report.url") + "/form/" + formID.String()
+
+		for _, item := range bookings.Value {
+			if _, err := service.PostToD365("new_bokningarkunds("+item.ID+")", `{"new_forkopsurl":"`+formURL+`"}`); err != nil {
+				l.Error("failed to update booking URL in D365", "booking_id", item.ID, "err", err)
+			} else {
+				l.Debug("updated booking URL in D365", "booking_id", item.ID)
+			}
+		}
+
 		l.Info("presale form created", "form_id", formID.String(), "customer", form.Name, "events", len(form.Events))
 		return c.SendString(formURL)
 	}
@@ -251,6 +260,8 @@ func createSoldForm(service reportform.UseCase, log *slog.Logger) fiber.Handler 
 				Amount:         0,
 				ExpirationTime: time.Now().Add(24 * time.Hour),
 				FormID:         formID,
+				Discounts:      item.Rabatter,
+				MinPrice:       item.MinBiljettpris,
 			})
 		}
 
@@ -281,7 +292,22 @@ func recreateSoldForm(service reportform.UseCase, log *slog.Logger) fiber.Handle
 			return err
 		}
 		if b.ID != uuid.Nil {
-			l.Debug("returning existing form for booking", "booking_id", bID.String(), "form_id", b.FormID.String())
+			// Refresh MinPrice and Discounts from D365 in case they were added after form creation.
+			refreshData, refreshErr := service.GetFromD365("new_bokningarkunds(" + bID.String() + ")?$select=new_bokningarkundid,new_rabatter,new_minimipris")
+			if refreshErr == nil {
+				refreshed := entity.Booking{}
+				if json.Unmarshal(refreshData, &refreshed) == nil && refreshed.ID != "" {
+					b.Discounts = refreshed.Rabatter
+					b.MinPrice = refreshed.MinBiljettpris
+					if updateErr := service.UpdateEvent(&b); updateErr != nil {
+						l.Error("failed to refresh event data", "booking_id", bID.String(), "err", updateErr)
+					} else {
+						l.Debug("refreshed event MinPrice and Discounts", "booking_id", bID.String(), "minprice", refreshed.MinBiljettpris, "rabatter", refreshed.Rabatter)
+					}
+				} else {
+					l.Warn("D365 returned unexpected data during event refresh", "booking_id", bID.String())
+				}
+			}
 			return c.SendString("https://" + viper.GetString("report.url") + "/form/" + b.FormID.String())
 		}
 
@@ -312,6 +338,8 @@ func recreateSoldForm(service reportform.UseCase, log *slog.Logger) fiber.Handle
 			Amount:         0,
 			ExpirationTime: time.Now().Add(24 * time.Hour),
 			FormID:         formID,
+			Discounts:      booking.Rabatter,
+			MinPrice:       booking.MinBiljettpris,
 		})
 
 		service.Create(form)
