@@ -26,8 +26,10 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          echo "${{ secrets.DEPLOY_KNOWN_HOST }}" >> ~/.ssh/known_hosts
-          install -m 600 /dev/stdin ~/.ssh/deploy_key <<< "${{ secrets.DEPLOY_SSH_KEY }}"
+          echo "${{ secrets.DEPLOY_KNOWN_HOST }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
 
       - name: Deploy fhp-reports binary
         run: |
@@ -55,6 +57,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
             bash << 'ENDSSH'
+          set -e
           chmod +x ~/fhp-reports/fhp-reports ~/fhp-bioguide/fhp-bioguide
           sudo setcap CAP_NET_BIND_SERVICE=+eip ~/fhp-reports/fhp-reports
           sudo systemctl restart fhp-reports fhp-bioguide
@@ -65,12 +68,13 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
             bash << 'ENDSSH'
+          set -e
           for svc in fhp-reports fhp-bioguide; do
             for i in $(seq 1 10); do
               systemctl is-active "$svc" && break
               sleep 2
             done
-            systemctl is-active "$svc" || (echo "$svc failed to start" && exit 1)
+            systemctl is-active "$svc" || { echo "$svc failed to start"; exit 1; }
           done
           echo "Both services active"
           ENDSSH
