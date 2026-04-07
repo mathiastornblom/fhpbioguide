@@ -26,7 +26,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          echo "${{ secrets.DEPLOY_KNOWN_HOST }}" > ~/.ssh/known_hosts
+          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOST }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
           printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
@@ -71,7 +71,7 @@ jobs:
           set -e
           for svc in fhp-reports fhp-bioguide; do
             for i in $(seq 1 10); do
-              systemctl is-active "$svc" && break
+              systemctl is-active "$svc" && break || true
               sleep 2
             done
             systemctl is-active "$svc" || { echo "$svc failed to start"; exit 1; }
