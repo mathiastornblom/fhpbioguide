@@ -1,0 +1,72 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build Linux binaries
+        run: make build-linux
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy fhp-reports binary
+        run: |
+          rsync -az \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            out/fhp-reports/fhp-reports \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/sysadmin/fhp-reports/fhp-reports
+
+      - name: Deploy fhp-bioguide binary
+        run: |
+          rsync -az \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            out/fhp-bioguide/fhp-bioguide \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/sysadmin/fhp-bioguide/fhp-bioguide
+
+      - name: Deploy views
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            views/ \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/sysadmin/fhp-reports/views/
+
+      - name: Post-deploy (setcap + restart services)
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            bash << 'ENDSSH'
+          chmod +x ~/fhp-reports/fhp-reports ~/fhp-bioguide/fhp-bioguide
+          sudo setcap CAP_NET_BIND_SERVICE=+eip ~/fhp-reports/fhp-reports
+          sudo systemctl restart fhp-reports fhp-bioguide
+          ENDSSH
+
+      - name: Verify services are active
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            bash << 'ENDSSH'
+          sleep 5
+          systemctl is-active fhp-reports || (echo "fhp-reports failed to start" && exit 1)
+          systemctl is-active fhp-bioguide || (echo "fhp-bioguide failed to start" && exit 1)
+          echo "Both services active"
+          ENDSSH
