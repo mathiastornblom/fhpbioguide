@@ -25,35 +25,35 @@ jobs:
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          chmod 700 ~/.ssh
+          echo "${{ secrets.DEPLOY_KNOWN_HOST }}" >> ~/.ssh/known_hosts
+          install -m 600 /dev/stdin ~/.ssh/deploy_key <<< "${{ secrets.DEPLOY_SSH_KEY }}"
 
       - name: Deploy fhp-reports binary
         run: |
           rsync -az \
             -e "ssh -i ~/.ssh/deploy_key" \
             out/fhp-reports/fhp-reports \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/sysadmin/fhp-reports/fhp-reports
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/sysadmin/fhp-reports/fhp-reports"
 
       - name: Deploy fhp-bioguide binary
         run: |
           rsync -az \
             -e "ssh -i ~/.ssh/deploy_key" \
             out/fhp-bioguide/fhp-bioguide \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/sysadmin/fhp-bioguide/fhp-bioguide
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/sysadmin/fhp-bioguide/fhp-bioguide"
 
       - name: Deploy views
         run: |
           rsync -az --delete \
             -e "ssh -i ~/.ssh/deploy_key" \
             views/ \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/sysadmin/fhp-reports/views/
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/sysadmin/fhp-reports/views/"
 
       - name: Post-deploy (setcap + restart services)
         run: |
           ssh -i ~/.ssh/deploy_key \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
             bash << 'ENDSSH'
           chmod +x ~/fhp-reports/fhp-reports ~/fhp-bioguide/fhp-bioguide
           sudo setcap CAP_NET_BIND_SERVICE=+eip ~/fhp-reports/fhp-reports
@@ -63,10 +63,14 @@ jobs:
       - name: Verify services are active
         run: |
           ssh -i ~/.ssh/deploy_key \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
             bash << 'ENDSSH'
-          sleep 5
-          systemctl is-active fhp-reports || (echo "fhp-reports failed to start" && exit 1)
-          systemctl is-active fhp-bioguide || (echo "fhp-bioguide failed to start" && exit 1)
+          for svc in fhp-reports fhp-bioguide; do
+            for i in $(seq 1 10); do
+              systemctl is-active "$svc" && break
+              sleep 2
+            done
+            systemctl is-active "$svc" || (echo "$svc failed to start" && exit 1)
+          done
           echo "Both services active"
           ENDSSH
