@@ -377,6 +377,9 @@ func postFormResult(service reportform.UseCase, log *slog.Logger) fiber.Handler 
 				ticketURL := c.FormValue("10_" + strconv.Itoa(id))
 
 				service.PostToD365("new_forkops", `{"new_boking@odata.bind":"new_bokningarkunds(`+event.ID.String()+`)","new_forkopsurl":"`+ticketURL+`","new_unit":`+strconv.Itoa(qty)+`}`)
+				if _, err := service.PostToD365("new_bokningarkunds("+event.ID.String()+")", `{"new_forkopsurl":"`+ticketURL+`"}`); err != nil {
+					l.Error("failed to update booking URL in D365", "booking_id", event.ID.String(), "err", err)
+				}
 
 				receipt = append(receipt, receiptEvent{
 					Name: event.Name,
