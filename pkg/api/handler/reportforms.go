@@ -208,14 +208,6 @@ func createPresaleForm(service reportform.UseCase, log *slog.Logger) fiber.Handl
 		service.Create(form)
 		formURL := "https://" + viper.GetString("report.url") + "/form/" + formID.String()
 
-		for _, item := range bookings.Value {
-			if _, err := service.PostToD365("new_bokningarkunds("+item.ID+")", `{"new_forkopsurl":"`+formURL+`"}`); err != nil {
-				l.Error("failed to update booking URL in D365", "booking_id", item.ID, "err", err)
-			} else {
-				l.Debug("updated booking URL in D365", "booking_id", item.ID)
-			}
-		}
-
 		l.Info("presale form created", "form_id", formID.String(), "customer", form.Name, "events", len(form.Events))
 		return c.SendString(formURL)
 	}
@@ -378,8 +370,23 @@ func postFormResult(service reportform.UseCase, log *slog.Logger) fiber.Handler 
 				qty, _ := strconv.Atoi(c.FormValue("00_"+strconv.Itoa(id), "0"))
 				ticketURL := c.FormValue("10_" + strconv.Itoa(id))
 
-				service.PostToD365("new_forkops", `{"new_boking@odata.bind":"new_bokningarkunds(`+event.ID.String()+`)","new_forkopsurl":"`+ticketURL+`","new_unit":`+strconv.Itoa(qty)+`}`)
-				if _, err := service.PostToD365("new_bokningarkunds("+event.ID.String()+")", `{"new_forkopsurl":"`+ticketURL+`"}`); err != nil {
+				// Marshal rather than string-concatenate: ticketURL is free text
+				// from the form and would otherwise break the JSON body.
+				forkopsData, err := json.Marshal(map[string]any{
+					"new_boking@odata.bind": "new_bokningarkunds(" + event.ID.String() + ")",
+					"new_forkopsurl":        ticketURL,
+					"new_unit":              qty,
+				})
+				if err != nil {
+					l.Error("failed to marshal forkops record", "booking_id", event.ID.String(), "err", err)
+				} else if _, err := service.PostToD365("new_forkops", string(forkopsData)); err != nil {
+					l.Error("failed to create forkops record in D365", "booking_id", event.ID.String(), "err", err)
+				}
+
+				bookingData, err := json.Marshal(map[string]any{"new_forkopsurl": ticketURL})
+				if err != nil {
+					l.Error("failed to marshal booking URL update", "booking_id", event.ID.String(), "err", err)
+				} else if _, err := service.PostToD365("new_bokningarkunds("+event.ID.String()+")", string(bookingData)); err != nil {
 					l.Error("failed to update booking URL in D365", "booking_id", event.ID.String(), "err", err)
 				}
 
