@@ -2,6 +2,7 @@ package bioguide
 
 import (
 	"errors"
+	"html"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,8 +12,11 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
+// specialChars contains characters that must be XML-escaped in the envelope.
+const specialChars = "a&b<c>"
+
 func newClient(url string) *BioGuiden {
-	return &BioGuiden{Resty: resty.New(), URL: url, Username: "user&1", Password: "p<w>"}
+	return &BioGuiden{Resty: resty.New(), URL: url, Username: specialChars, Password: specialChars + "!"}
 }
 
 func TestSOAPRequestEscapesCredentials(t *testing.T) {
@@ -27,8 +31,12 @@ func TestSOAPRequestEscapesCredentials(t *testing.T) {
 	if _, err := newClient(srv.URL).SOAPRequest("x.asmx", "<doc/>"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(got, "<username>user&amp;1</username>") || !strings.Contains(got, "<password>p&lt;w&gt;</password>") {
+	escaped := html.EscapeString(specialChars)
+	if !strings.Contains(got, "<username>"+escaped+"</username>") || !strings.Contains(got, "<password>"+escaped+"!</password>") {
 		t.Fatalf("credentials not escaped: %s", got)
+	}
+	if strings.Contains(got, specialChars) {
+		t.Fatalf("raw special characters leaked into envelope: %s", got)
 	}
 }
 
