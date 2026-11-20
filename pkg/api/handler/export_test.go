@@ -14,11 +14,13 @@ import (
 )
 
 type fakeCash struct {
-	listErr error
-	posts   []string
+	listErr   error
+	posts     []string
+	listStart time.Time // start-date the last ExportList call asked for
 }
 
-func (f *fakeCash) ExportList(_, _ time.Time) (*entity.CashReportsDistributoristListExport, error) {
+func (f *fakeCash) ExportList(start, _ time.Time) (*entity.CashReportsDistributoristListExport, error) {
+	f.listStart = start
 	if f.listErr != nil {
 		return nil, f.listErr
 	}
@@ -34,8 +36,8 @@ func (f *fakeCash) Export(_ time.Time) (*entity.CashReportsDistributoristExport,
 <salon><fkb-number>1</fkb-number></salon>
 <playweek><start-date>2026-01-01T00:00:00</start-date><end-date>2026-01-07T00:00:00</end-date></playweek>
 <movie><full-movie-number>1-2-3</full-movie-number></movie>
-<shows><show id="1"><start-date-time>2026-01-02T18:00:00</start-date-time>
-<ticket-details><detail id="1"><category>Ordinarie</category><quantity>2</quantity><price>100</price></detail></ticket-details>
+<shows><show id="1"><type-id>1000</type-id><start-date-time>2026-01-02T18:00:00</start-date-time>
+<ticket-details><detail id="1"><type-id>3030</type-id><specification/><quantity>2</quantity><price>0,00</price></detail></ticket-details>
 <total-distributor-amount>200</total-distributor-amount></show></shows>
 <approved><distributor-date>2026-01-03T10:00:00</distributor-date></approved>
 </cashreport></cashreports></data></document></ExportResponse></Body></Envelope>`), &r)
@@ -83,8 +85,10 @@ func TestCashExportWritesDistributorID(t *testing.T) {
 		{Name: "FHP Service", DistributorID: 423, Service: service},
 	}
 
-	if err := ExecuteExports(time.Now().AddDate(0, 0, -1), fakeMovies{}, sources, fakeTheatres{}, log); err != nil {
-		t.Fatal(err)
+	for _, r := range ExecuteExports(fakeMovies{}, sources, fakeTheatres{}, log) {
+		if r.Err != nil {
+			t.Fatal(r.Err)
+		}
 	}
 	if len(riks.posts) != 1 || !strings.Contains(riks.posts[0], `"new_distributorid":26`) {
 		t.Fatalf("riks payload: %v", riks.posts)
@@ -103,9 +107,15 @@ func TestFailingSourceDoesNotStopOthers(t *testing.T) {
 		{Name: "FHP Service", DistributorID: 423, Service: good},
 	}
 
-	err := ExecuteExports(time.Now().AddDate(0, 0, -1), fakeMovies{}, sources, fakeTheatres{}, log)
-	if err == nil || !strings.Contains(err.Error(), "FHP Riks") {
-		t.Fatalf("expected error naming FHP Riks, got %v", err)
+	results := ExecuteExports(fakeMovies{}, sources, fakeTheatres{}, log)
+	if len(results) != 2 {
+		t.Fatalf("want a result per source, got %d", len(results))
+	}
+	if results[0].Err == nil || !strings.Contains(results[0].Err.Error(), "FHP Riks") {
+		t.Fatalf("expected error naming FHP Riks, got %v", results[0].Err)
+	}
+	if results[1].Err != nil {
+		t.Fatalf("FHP Service should succeed independently, got %v", results[1].Err)
 	}
 	if len(good.posts) != 1 {
 		t.Fatalf("second source not processed: %v", good.posts)
@@ -126,4 +136,77 @@ func marshal(t *testing.T, v any) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+func TestCashExportLogsDistributor(t *testing.T) {
+	var buf strings.Builder
+	log := slog.New(slog.NewTextHandler(&buf, nil))
+	src := CashSource{Name: "FHP Service", DistributorID: 423, Service: &fakeCash{}}
+
+	if err := CashExport(time.Now().AddDate(0, 0, -1), src, fakeMovies{}, fakeTheatres{}, log); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, want := range []string{"imported cash report", "cash reports done", `distributor="FHP Service"`, "distributor_id=423"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("log output missing %q:\n%s", want, out)
+		}
+	}
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if strings.Count(line, "component=") != 1 {
+			t.Fatalf("expected a single component attr: %s", line)
+		}
+	}
+}
+
+func TestEachSourceUsesItsOwnWindow(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	riksStart := time.Date(2026, 11, 20, 2, 0, 0, 0, time.Local)
+	serviceStart := time.Date(2026, 11, 10, 2, 0, 0, 0, time.Local)
+	riks, service := &fakeCash{}, &fakeCash{}
+	sources := []CashSource{
+		{Name: "FHP Riks", DistributorID: 26, LastSync: riksStart, Service: riks},
+		{Name: "FHP Service", DistributorID: 423, LastSync: serviceStart, Service: service},
+	}
+
+	ExecuteExports(fakeMovies{}, sources, fakeTheatres{}, log)
+
+	if !riks.listStart.Equal(riksStart) {
+		t.Fatalf("riks window start = %v, want %v", riks.listStart, riksStart)
+	}
+	if !service.listStart.Equal(serviceStart) {
+		t.Fatalf("service window start = %v, want %v", service.listStart, serviceStart)
+	}
+}
+
+func TestCashExportUsesTypeIDForCategory(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	cash := &fakeCash{}
+	src := CashSource{Name: "FHP Service", DistributorID: 423, Service: cash}
+
+	if err := CashExport(time.Now().AddDate(0, 0, -1), src, fakeMovies{}, fakeTheatres{}, log); err != nil {
+		t.Fatal(err)
+	}
+	if len(cash.posts) != 1 || !strings.Contains(cash.posts[0], `"new_ticketcategory":"Fribiljett: Press"`) || !strings.Contains(cash.posts[0], `"new_name":"Fribiljett: Press"`) {
+		t.Fatalf("category should come from type-id 3030 when specification is empty: %v", cash.posts)
+	}
+}
+
+func TestTicketCategory(t *testing.T) {
+	tests := []struct{ typeID, spec, legacy, want string }{
+		{"1000", "", "", "Ordinarie"},
+		{"1000", "Knattebio 60", "", "Knattebio 60"}, // theatre wording wins over the type name
+		{"4000", "Barnrabatt 20% - CHISB", "", "Barnrabatt 20% - CHISB"},
+		{"3030", "", "", "Fribiljett: Press"},
+		{"5011", "", "", "Medlemsbiljett: Biopasset"},
+		{"", "", "Ordinarie", "Ordinarie"}, // schema 1.3 response
+		{"9999", "", "", "Biljettyp 9999"}, // new id BioGuiden added later
+		{"1000", "  ", "", "Ordinarie"},    // blank specification
+		{"", "", "", ""},
+	}
+	for _, tc := range tests {
+		if got := ticketCategory(tc.typeID, tc.spec, tc.legacy); got != tc.want {
+			t.Errorf("ticketCategory(%q,%q,%q) = %q, want %q", tc.typeID, tc.spec, tc.legacy, got, tc.want)
+		}
+	}
 }

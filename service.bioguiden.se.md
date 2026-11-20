@@ -202,13 +202,13 @@ Note: TheatreExport is currently **not called** by the nightly job (`ExecuteExpo
 ### 3. CashReportsDistributorExport
 
 **Endpoint:** `CashReportsDistributorExport.asmx`
-**Schema:** `CashReportsDistributorExportSchema1_3.xsd` (version 1.3)
+**Schema:** `CashReportsDistributorExportSchema1_6.xsd` (version 1.6, the current one)
 **Go entity:** `entity.CashReportsDistributoristExport` in `pkg/entity/cashreport.go`
 **Repository:** `pkg/repository/cashreport_repository.go`
 
-Returns fully-approved cash reports (distributor view) updated on a given date. The sync first asks `CashReportsDistributorListExport` for the dates with changes since the last successful sync, then fetches each date. This is done once per configured account (FHP Riks and any `bio.extraCashDistributors`); every imported row gets the account's id in D365 `new_distributorid`. A failing account does not stop the others, but the sync state is not advanced, so the window is retried (re-import is idempotent).
+Returns fully-approved cash reports (distributor view) updated on a given date. The sync first asks `CashReportsDistributorListExport` for the dates with changes since the last successful sync, then fetches each date. This is done once per configured account (FHP Riks and any `bio.extraCashDistributors`); every imported row gets the account's id in D365 `new_distributorid`. Each account has its own sync tracker in `sync_state.json` (`distributors` keyed by id), so a failing account does not stop the others or hold back their window: only the accounts that succeeded are advanced, the failed one retries its window next run (re-import is idempotent). An account without an entry starts from the global `last_sync_completed` (older state files keep working), or 48 hours back if that is missing too. `last_sync_completed` itself only advances when every account succeeded.
 
-API status: the BioGuiden docs list version 1.3 as *obsolete* (only 1.6 is current; 1.4 is obsolete and 1.5 was closed 2026-04-16). From 1.4 on `category` in ticket details is replaced by `type-id` + `specification`, so a move to 1.6 needs a type-id to category mapping.
+API status: 1.6 is the current version (1.5 closed 2026-04-16, 1.4 and 1.3 obsolete). From 1.4 `category` in ticket details is replaced by `type-id` + `specification`; 1.5 adds `movie.language`/`movie.subtitles`; 1.6 adds `show.type-id`. The sync stores `specification` when set, otherwise the name of the ticket `type-id` (table in `pkg/api/handler/tickettype.go`), otherwise `Biljettyp <id>`; the legacy `category` is still honoured if a response contains it.
 
 #### Request `<data>` block
 
@@ -242,7 +242,8 @@ API status: the BioGuiden docs list version 1.3 as *obsolete* (only 1.6 is curre
 
 | XML field | Go field | Used for |
 |-----------|----------|---------|
-| `category` | `Category` | D365 `new_name` and `new_ticketcategory` |
+| `specification` / `type-id` (1.4+) | `Specification` / `TypeID` | D365 `new_name` and `new_ticketcategory`: specification, else type-id name (e.g. 1000 = Ordinarie, 3030 = Fribiljett: Press) |
+| `category` (≤1.3) | `Category` | Fallback only |
 | `quantity` | `Quantity` | D365 `new_ticket_quantity` |
 | `price` | `Price` | D365 `new_ticket_price` (comma → dot before float parse) |
 

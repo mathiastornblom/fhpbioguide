@@ -167,8 +167,7 @@ func runSync(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioGuiden, cas
 	}()
 
 	jobStart := time.Now()
-	lastSync := syncstate.ReadState(l)
-	l.Info("starting", "window_from", lastSync.Format("2006-01-02T15:04:05"))
+	l.Info("starting")
 
 	if err := dynamicsClient.AuthenticateApi(); err != nil {
 		l.Error("D365 auth failed", "err", err)
@@ -181,14 +180,33 @@ func runSync(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioGuiden, cas
 	theatreRepository := repository.NewTheatreExportRepository(dynamicsClient, bioguidenClient)
 	theatreService := theatreexport.NewService(theatreRepository)
 
+	// Each account has its own sync tracker, so a failing account does not hold back the others.
 	sources := make([]handler.CashSource, 0, len(cashAccounts))
 	for _, a := range cashAccounts {
 		repo := repository.NewCashReportRepository(dynamicsClient, a.client, appLog.With("component", "CashReportRepo", "distributor", a.name))
-		sources = append(sources, handler.CashSource{Name: a.name, DistributorID: a.id, Service: cashreports.NewService(repo)})
+		sources = append(sources, handler.CashSource{
+			Name:          a.name,
+			DistributorID: a.id,
+			LastSync:      syncstate.ReadDistributorState(a.id, l),
+			Service:       cashreports.NewService(repo),
+		})
+		l.Info("window", "distributor", a.name, "distributor_id", a.id, "from", sources[len(sources)-1].LastSync.Format("2006-01-02T15:04:05"))
 	}
 
-	if err := handler.ExecuteExports(lastSync, movieService, sources, theatreService, appLog); err != nil {
-		l.Error("export failed — state not updated, will retry next run", "err", err)
+	failed := 0
+	for _, r := range handler.ExecuteExports(movieService, sources, theatreService, appLog) {
+		if r.Err != nil {
+			failed++
+			l.Error("export failed — this account's state not updated, will retry next run", "distributor", r.Source.Name, "distributor_id", r.Source.DistributorID, "err", r.Err)
+			continue
+		}
+		if err := syncstate.WriteDistributorState(r.Source.DistributorID, jobStart); err != nil {
+			l.Error("could not write distributor sync state", "distributor", r.Source.Name, "distributor_id", r.Source.DistributorID, "err", err)
+			failed++
+		}
+	}
+	if failed > 0 {
+		l.Error("sync finished with failures", "failed_accounts", failed, "of", len(sources))
 		return
 	}
 

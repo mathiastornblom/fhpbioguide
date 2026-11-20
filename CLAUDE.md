@@ -49,7 +49,7 @@ Three export pipelines, each following the same pattern:
 |---|---|---|
 | MovieExport | XML movie catalog (2018–2030) | Product entities |
 | TheatreExport | Theatres and salons | `new_lokal` + accounts |
-| CashExport | cash reports since last sync, once per configured account | `new_cashreport` entities (`new_distributorid` = 26 / 423) |
+| CashExport | cash reports since last sync, once per configured account (each account has its own sync tracker in `sync_state.json`) | `new_cashreport` entities (`new_distributorid` = 26 / 423) |
 
 ### App 2: fhpreports (`cmd/fhpreports/`)
 A **Fiber HTTPS web service** (port 443, Let's Encrypt) serving HTML forms for cinema staff to report ticket sales. Form data is written to MySQL and pushed to D365 booking entities, then a Power Automate webhook is triggered.

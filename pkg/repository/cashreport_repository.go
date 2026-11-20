@@ -36,9 +36,9 @@ func NewCashReportRepository(dynamics *d365.D365, bioClient *bioguide.BioGuiden,
 func (r *CashReportRepository) Export(updatedDate time.Time) (response *entity.CashReportsDistributoristExport, err error) {
 	hostname, _ := os.Hostname()
 	xmlDocument := `<?xml version="1.0" encoding="iso8859-1"?>
-<document schema="CashReportsDistributorExportSchema1_3.xsd">
+<document schema="CashReportsDistributorExportSchema1_6.xsd">
     <information>
-        <name>Cashreport list export v1.3</name>
+        <name>Cashreport export v1.6</name>
         <description>Retrieves a list of all cashreports in the given span that the distributor user has access to from https://service.bioguiden.se</description>
         <log-id>` + uuid.New().String() + `</log-id>
         <created>` + time.Now().Format("2006-01-02T15:04:05") + `</created>

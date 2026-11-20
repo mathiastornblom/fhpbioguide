@@ -76,6 +76,8 @@ type CashReportsDistributoristExport struct {
 								FullMovieNumber string `xml:"full-movie-number"`
 								Title           string `xml:"title"`
 								OriginalTitle   string `xml:"original-title"`
+								Language        string `xml:"language"`  // 1.5+
+								Subtitles       string `xml:"subtitles"` // 1.5+
 								PictureFormat   string `xml:"picture-format"`
 								MovieFormat     string `xml:"movie-format"`
 								Resolution      string `xml:"resolution"`
@@ -96,6 +98,7 @@ type CashReportsDistributoristExport struct {
 								Show []struct {
 									Text          string `xml:",chardata"`
 									ID            string `xml:"id,attr"`
+									TypeID        string `xml:"type-id"` // 1.6: kind of show, e.g. 1000 = ordinary open show
 									StartDateTime string `xml:"start-date-time"`
 									TicketDetails struct {
 										Text   string `xml:",chardata"`
@@ -103,7 +106,10 @@ type CashReportsDistributoristExport struct {
 											Text     string `xml:",chardata"`
 											ID       string `xml:"id,attr"`
 											TypeID   string `xml:"type-id"`
-											Category string `xml:"category"`
+											// Specification replaces Category from schema 1.4. Category is
+											// only filled by older schema versions and kept for them.
+											Specification string `xml:"specification"`
+											Category      string `xml:"category"`
 											Quantity string `xml:"quantity"`
 											Price    string `xml:"price"`
 											Total    string `xml:"total"`

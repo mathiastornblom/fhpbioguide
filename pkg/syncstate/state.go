@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -17,35 +18,30 @@ const stateFile = "sync_state.json"
 // and removed automatically — guards against crashes leaving a permanent lock.
 const staleLockAge = 4 * time.Hour
 
+// syncState is the content of sync_state.json.
+//
+// LastSyncCompleted is the last run in which every distributor account succeeded.
+// It is also the fallback start for an account that has no entry of its own yet,
+// which keeps files written by older versions working.
+// Distributors holds the last successful run per distributor id, so an account that
+// fails does not hold back the others.
 type syncState struct {
-	LastSyncCompleted time.Time `json:"last_sync_completed"`
+	LastSyncCompleted time.Time            `json:"last_sync_completed"`
+	Distributors      map[string]time.Time `json:"distributors,omitempty"`
 }
 
-// ReadState returns the timestamp of the last completed sync.
-// Falls back to 48 hours ago if the file is missing or unreadable,
-// which causes the next run to perform a short backfill automatically.
-func ReadState(log *slog.Logger) time.Time {
+func loadState() (syncState, error) {
+	var s syncState
 	data, err := os.ReadFile(stateFile)
 	if err != nil {
-		fallback := time.Now().Add(-48 * time.Hour)
-		log.Warn("no state file found, defaulting", "fallback", fallback.Format("2006-01-02T15:04:05"), "component", "syncstate")
-		return fallback
+		return s, err
 	}
-	var s syncState
-	if err := json.Unmarshal(data, &s); err != nil || s.LastSyncCompleted.IsZero() {
-		fallback := time.Now().Add(-48 * time.Hour)
-		log.Warn("could not parse state file, defaulting", "fallback", fallback.Format("2006-01-02T15:04:05"), "component", "syncstate", "err", err)
-		return fallback
-	}
-	log.Debug("last sync completed", "timestamp", s.LastSyncCompleted.Format("2006-01-02T15:04:05"), "component", "syncstate")
-	return s.LastSyncCompleted
+	err = json.Unmarshal(data, &s)
+	return s, err
 }
 
-// WriteState persists t as the last completed sync time.
-// Uses an atomic write (temp file → rename) to prevent corruption
-// if the process is killed during the write.
-func WriteState(t time.Time) error {
-	data, err := json.MarshalIndent(syncState{LastSyncCompleted: t}, "", "  ")
+func saveState(s syncState) error {
+	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -54,6 +50,61 @@ func WriteState(t time.Time) error {
 		return err
 	}
 	return os.Rename(tmp, stateFile)
+}
+
+// ReadState returns the timestamp of the last completed sync.
+// Falls back to 48 hours ago if the file is missing or unreadable,
+// which causes the next run to perform a short backfill automatically.
+func ReadState(log *slog.Logger) time.Time {
+	s, err := loadState()
+	if err != nil || s.LastSyncCompleted.IsZero() {
+		fallback := time.Now().Add(-48 * time.Hour)
+		log.Warn("no usable state file, defaulting", "fallback", fallback.Format("2006-01-02T15:04:05"), "component", "syncstate", "err", err)
+		return fallback
+	}
+	log.Debug("last sync completed", "timestamp", s.LastSyncCompleted.Format("2006-01-02T15:04:05"), "component", "syncstate")
+	return s.LastSyncCompleted
+}
+
+// ReadDistributorState returns the last successful sync time for one distributor.
+// An account without an entry starts from the global last_sync_completed, and when
+// that is missing too from 48 hours ago (same short backfill as ReadState).
+func ReadDistributorState(id int, log *slog.Logger) time.Time {
+	s, err := loadState()
+	if err == nil {
+		if t, ok := s.Distributors[strconv.Itoa(id)]; ok && !t.IsZero() {
+			log.Debug("last distributor sync", "distributor_id", id, "timestamp", t.Format("2006-01-02T15:04:05"), "component", "syncstate")
+			return t
+		}
+		if !s.LastSyncCompleted.IsZero() {
+			log.Info("no state for distributor yet, using global last sync", "distributor_id", id, "timestamp", s.LastSyncCompleted.Format("2006-01-02T15:04:05"), "component", "syncstate")
+			return s.LastSyncCompleted
+		}
+	}
+	fallback := time.Now().Add(-48 * time.Hour)
+	log.Warn("no usable state for distributor, defaulting", "distributor_id", id, "fallback", fallback.Format("2006-01-02T15:04:05"), "component", "syncstate")
+	return fallback
+}
+
+// WriteDistributorState records t as the last successful sync for one distributor,
+// keeping every other entry in the file.
+func WriteDistributorState(id int, t time.Time) error {
+	s, _ := loadState() // a missing or broken file starts a fresh one
+	if s.Distributors == nil {
+		s.Distributors = map[string]time.Time{}
+	}
+	s.Distributors[strconv.Itoa(id)] = t
+	return saveState(s)
+}
+
+// WriteState persists t as the last completed sync time for the whole run
+// (every account succeeded), keeping the per-distributor entries.
+// Uses an atomic write (temp file → rename) to prevent corruption
+// if the process is killed during the write.
+func WriteState(t time.Time) error {
+	s, _ := loadState()
+	s.LastSyncCompleted = t
+	return saveState(s)
 }
 
 // AcquireLock attempts to create an exclusive lock file at lockFile.
