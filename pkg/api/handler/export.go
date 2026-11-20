@@ -3,6 +3,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -15,10 +16,37 @@ import (
 	"fhpbioguide/pkg/usecase/theatreexport"
 )
 
-func ExecuteExports(lastSync time.Time, movieService movieexport.UseCase, cashreportService cashreports.UseCase, theatreService theatreexport.UseCase, log *slog.Logger) error {
+// CashSource is one BioGuiden distributor account that cash reports are fetched from.
+type CashSource struct {
+	Name          string    // label used in logs, e.g. "FHP Riks"
+	DistributorID int       // written to new_distributorid on every cash report row
+	LastSync      time.Time // start of this account's fetch window (its own sync tracker)
+	Service       cashreports.UseCase
+}
+
+// SourceResult is the outcome of the cash report export for one source.
+type SourceResult struct {
+	Source CashSource
+	Err    error
+}
+
+// ExecuteExports runs the movie export and then fetches cash reports for every source,
+// each from its own LastSync. A failing source does not stop the others. The result per
+// source lets the caller advance only the trackers of the accounts that succeeded; a
+// failed account retries its window next run (re-import is idempotent).
+func ExecuteExports(movieService movieexport.UseCase, sources []CashSource, theatreService theatreexport.UseCase, log *slog.Logger) []SourceResult {
 	// NOTE: TheatreExport is intentionally NOT called here — matches original behaviour.
 	MovieExport(movieService, log)
-	return CashExport(lastSync, cashreportService, movieService, theatreService, log)
+
+	results := make([]SourceResult, 0, len(sources))
+	for _, src := range sources {
+		err := CashExport(src.LastSync, src, movieService, theatreService, log)
+		if err != nil {
+			err = fmt.Errorf("%s: %w", src.Name, err)
+		}
+		results = append(results, SourceResult{Source: src, Err: err})
+	}
+	return results
 }
 
 func MovieExport(service movieexport.UseCase, log *slog.Logger) error {
@@ -231,8 +259,10 @@ func TheatreExport(service theatreexport.UseCase, log *slog.Logger) {
 
 // CashExport fetches all dates with approved cash-report changes since lastSync
 // and processes each one using CashExportWithDate.
-func CashExport(lastSync time.Time, service cashreports.UseCase, movieService movieexport.UseCase, theatreService theatreexport.UseCase, log *slog.Logger) error {
-	l := log.With("component", "CashExport")
+func CashExport(lastSync time.Time, src CashSource, movieService movieexport.UseCase, theatreService theatreexport.UseCase, log *slog.Logger) error {
+	service := src.Service
+	base := log.With("distributor", src.Name, "distributor_id", src.DistributorID)
+	l := base.With("component", "CashExport")
 	l.Info("fetching activity dates", "since", lastSync.Format("2006-01-02"))
 	start := time.Now()
 
@@ -245,6 +275,8 @@ func CashExport(lastSync time.Time, service cashreports.UseCase, movieService mo
 	dates := list.Body.ExportResponse.Document.Data.Dates.Date
 	l.Info("dates to process", "count", len(dates))
 
+	var failed []error
+
 	for i, d := range dates {
 		t, parseErr := time.Parse("2006-01-02", d.UpdatedDate)
 		if parseErr != nil {
@@ -252,18 +284,30 @@ func CashExport(lastSync time.Time, service cashreports.UseCase, movieService mo
 			continue
 		}
 		l.Info("processing date", "progress", fmt.Sprintf("%d/%d", i+1, len(dates)), "date", d.UpdatedDate, "reports", d.NumberOfCashreports)
-		CashExportWithDate(t, service, movieService, theatreService, l)
+		if err := CashExportWithDate(t, src, movieService, theatreService, base); err != nil {
+			l.Error("cash report export failed for date", "date", d.UpdatedDate, "err", err)
+			failed = append(failed, err)
+		}
 	}
 
-	l.Info("completed", "dates", len(dates), "duration", time.Since(start).Round(time.Second).String())
-	return nil
+	l.Info("completed", "dates", len(dates), "failed", len(failed), "duration", time.Since(start).Round(time.Second).String())
+	return errors.Join(failed...)
 }
 
-func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movieService movieexport.UseCase, theatreService theatreexport.UseCase, log *slog.Logger) {
+// CashExportWithDate imports all cash reports updated on updatedDate from one source.
+func CashExportWithDate(updatedDate time.Time, src CashSource, movieService movieexport.UseCase, theatreService theatreexport.UseCase, log *slog.Logger) error {
+	service := src.Service
 	l := log.With("component", "CashExportWithDate")
-	data, _ := service.Export(updatedDate)
+	dateStr := updatedDate.Format("2006-01-02")
+	data, err := service.Export(updatedDate)
+	if err != nil {
+		return fmt.Errorf("Export %s: %w", updatedDate.Format("2006-01-02"), err)
+	}
 	reports := data.Body.ExportResponse.Document.Data.Cashreports.Cashreport
 	numTotal := len(reports)
+	var postErrs []error
+	imported, skipped, rowsPosted := 0, 0, 0
+	l.Info("fetched cash reports", "date", dateStr, "reports", numTotal)
 
 	for id1, report := range reports {
 		l.Debug("processing report", "progress", fmt.Sprintf("%d/%d", id1+1, numTotal), "report", report.CashreportNumber)
@@ -290,6 +334,7 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 
 			if incomingApproved == nil || (storedApproved != nil && !incomingApproved.After(*storedApproved)) {
 				l.Debug("report already up to date, skipping", "report", report.CashreportNumber)
+				skipped++
 				continue
 			}
 
@@ -327,6 +372,7 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 			continue
 		}
 		movieNum := cashParts[2]
+		rowsBefore := rowsPosted
 
 		numShows := len(report.Shows.Show)
 		for id, show := range report.Shows.Show {
@@ -339,6 +385,7 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 			reportLine := entity.DynamicsCashReport{
 				FKBID:           report.Salon.FkbNumber,
 				Source:          100000000,
+				DistributorID:   src.DistributorID,
 				Playweek:        playweekStart.Format("2006-01-02") + " - " + playweekEnd.Format("2006-01-02"),
 				RecordedAmount:  recordedAmount,
 				ReportNum:       report.CashreportNumber,
@@ -383,16 +430,28 @@ func CashExportWithDate(updatedDate time.Time, service cashreports.UseCase, movi
 				quantity, _ := strconv.Atoi(ticketDetail.Quantity)
 				price, _ := strconv.ParseFloat(strings.ReplaceAll(ticketDetail.Price, ",", "."), 32)
 
-				reportLine.Name = ticketDetail.Category
-				reportLine.TicketName = ticketDetail.Category
+				category := ticketCategory(ticketDetail.TypeID, ticketDetail.Specification, ticketDetail.Category)
+				reportLine.Name = category
+				reportLine.TicketName = category
 				reportLine.TicketQuantity = quantity
 				reportLine.TicketPrice = price
 
 				jsData, _ := json.Marshal(reportLine)
-				service.PostToD365("new_cashreports", string(jsData))
+				if _, err := service.PostToD365("new_cashreports", string(jsData)); err != nil {
+					l.Error("failed to post cash report row to D365", "report", report.CashreportNumber, "show", id+1, "err", err)
+					postErrs = append(postErrs, fmt.Errorf("report %s: %w", report.CashreportNumber, err))
+				} else {
+					rowsPosted++
+				}
 			}
 		}
+		if rowsPosted > rowsBefore {
+			imported++
+			l.Info("imported cash report", "report", report.CashreportNumber, "rows", rowsPosted-rowsBefore)
+		}
 	}
+	l.Info("cash reports done", "date", dateStr, "reports", numTotal, "imported", imported, "skipped_up_to_date", skipped, "rows", rowsPosted, "errors", len(postErrs))
+	return errors.Join(postErrs...)
 }
 
 func UpdateCashreports(updatedDate time.Time, service cashreports.UseCase, movieService movieexport.UseCase, theatreService theatreexport.UseCase) {

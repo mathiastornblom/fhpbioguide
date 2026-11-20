@@ -23,6 +23,21 @@ import (
 
 var appLog *slog.Logger
 
+// cashAccount is one BioGuiden distributor login used to fetch cash reports.
+type cashAccount struct {
+	name   string
+	id     int // written to new_distributorid in D365
+	client *bioguide.BioGuiden
+}
+
+// extraDistributor is an entry in bio.extraCashDistributors in config.yaml.
+type extraDistributor struct {
+	Name     string `mapstructure:"name"`
+	ID       int    `mapstructure:"id"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+}
+
 func main() {
 	initConfig()
 
@@ -40,9 +55,13 @@ func main() {
 
 	dynamicsClient := createDynamicsClient()
 	bioguidenClient := createBioguideClient()
+	cashAccounts := createCashAccounts(bioguidenClient)
+	for _, a := range cashAccounts {
+		appLog.Info("cash report account configured", "name", a.name, "distributor_id", a.id)
+	}
 
-	startTriggerPoller(dynamicsClient, bioguidenClient)
-	scheduleExportJob(dynamicsClient, bioguidenClient)
+	startTriggerPoller(dynamicsClient, bioguidenClient, cashAccounts)
+	scheduleExportJob(dynamicsClient, bioguidenClient, cashAccounts)
 }
 
 func initConfig() {
@@ -53,6 +72,8 @@ func initConfig() {
 		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
 
+	viper.SetDefault("bio.id", 26) // FHP Riks
+	viper.SetDefault("bio.name", "FHP Riks")
 	viper.SetDefault("sync.triggerFile", "/tmp/fhp_sync_trigger")
 	viper.SetDefault("sync.lockFile", "/tmp/fhp_sync.lock")
 	viper.SetDefault("log.verbose", false)
@@ -83,7 +104,50 @@ func createBioguideClient() *bioguide.BioGuiden {
 	}
 }
 
-func runSync(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioGuiden) {
+// createCashAccounts returns the accounts cash reports are fetched from: the main
+// bio account (FHP Riks) first, then every entry in bio.extraCashDistributors.
+// It panics on an incomplete entry, so a misconfiguration is caught at startup
+// instead of producing rows without distributor id.
+func createCashAccounts(main *bioguide.BioGuiden) []cashAccount {
+	accounts := []cashAccount{{
+		name:   viper.GetString("bio.name"),
+		id:     viper.GetInt("bio.id"),
+		client: main,
+	}}
+
+	var extras []extraDistributor
+	if err := viper.UnmarshalKey("bio.extraCashDistributors", &extras); err != nil {
+		panic(fmt.Errorf("invalid bio.extraCashDistributors in config: %w", err))
+	}
+	seen := map[int]bool{accounts[0].id: true}
+	for i, e := range extras {
+		if e.ID <= 0 || e.Username == "" || e.Password == "" {
+			panic(fmt.Errorf("bio.extraCashDistributors[%d] (%q): id, username and password are required", i, e.Name))
+		}
+		if seen[e.ID] {
+			panic(fmt.Errorf("bio.extraCashDistributors[%d] (%q): duplicate distributor id %d", i, e.Name, e.ID))
+		}
+		seen[e.ID] = true
+		name := e.Name
+		if name == "" {
+			name = fmt.Sprintf("distributor %d", e.ID)
+		}
+		accounts = append(accounts, cashAccount{
+			name: name,
+			id:   e.ID,
+			client: &bioguide.BioGuiden{
+				Resty:    resty.New().SetTimeout(60 * time.Second),
+				URL:      viper.GetString("bio.url"),
+				Username: e.Username,
+				Password: e.Password,
+				Logger:   appLog.With("component", "BioGuide", "distributor", name),
+			},
+		})
+	}
+	return accounts
+}
+
+func runSync(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioGuiden, cashAccounts []cashAccount) {
 	lockFile := viper.GetString("sync.lockFile")
 	l := appLog.With("component", "Sync")
 
@@ -103,8 +167,7 @@ func runSync(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioGuiden) {
 	}()
 
 	jobStart := time.Now()
-	lastSync := syncstate.ReadState(l)
-	l.Info("starting", "window_from", lastSync.Format("2006-01-02T15:04:05"))
+	l.Info("starting")
 
 	if err := dynamicsClient.AuthenticateApi(); err != nil {
 		l.Error("D365 auth failed", "err", err)
@@ -117,11 +180,33 @@ func runSync(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioGuiden) {
 	theatreRepository := repository.NewTheatreExportRepository(dynamicsClient, bioguidenClient)
 	theatreService := theatreexport.NewService(theatreRepository)
 
-	cashReportRepo := repository.NewCashReportRepository(dynamicsClient, bioguidenClient, appLog.With("component", "CashReportRepo"))
-	cashReportService := cashreports.NewService(cashReportRepo)
+	// Each account has its own sync tracker, so a failing account does not hold back the others.
+	sources := make([]handler.CashSource, 0, len(cashAccounts))
+	for _, a := range cashAccounts {
+		repo := repository.NewCashReportRepository(dynamicsClient, a.client, appLog.With("component", "CashReportRepo", "distributor", a.name))
+		sources = append(sources, handler.CashSource{
+			Name:          a.name,
+			DistributorID: a.id,
+			LastSync:      syncstate.ReadDistributorState(a.id, l),
+			Service:       cashreports.NewService(repo),
+		})
+		l.Info("window", "distributor", a.name, "distributor_id", a.id, "from", sources[len(sources)-1].LastSync.Format("2006-01-02T15:04:05"))
+	}
 
-	if err := handler.ExecuteExports(lastSync, movieService, cashReportService, theatreService, appLog); err != nil {
-		l.Error("export failed — state not updated, will retry next run", "err", err)
+	failed := 0
+	for _, r := range handler.ExecuteExports(movieService, sources, theatreService, appLog) {
+		if r.Err != nil {
+			failed++
+			l.Error("export failed — this account's state not updated, will retry next run", "distributor", r.Source.Name, "distributor_id", r.Source.DistributorID, "err", r.Err)
+			continue
+		}
+		if err := syncstate.WriteDistributorState(r.Source.DistributorID, jobStart); err != nil {
+			l.Error("could not write distributor sync state", "distributor", r.Source.Name, "distributor_id", r.Source.DistributorID, "err", err)
+			failed++
+		}
+	}
+	if failed > 0 {
+		l.Error("sync finished with failures", "failed_accounts", failed, "of", len(sources))
 		return
 	}
 
@@ -132,7 +217,7 @@ func runSync(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioGuiden) {
 	}
 }
 
-func startTriggerPoller(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioGuiden) {
+func startTriggerPoller(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioGuiden, cashAccounts []cashAccount) {
 	triggerFile := viper.GetString("sync.triggerFile")
 	l := appLog.With("component", "Scheduler")
 	l.Info("trigger poller started", "path", triggerFile, "interval", "60s")
@@ -144,7 +229,7 @@ func startTriggerPoller(dynamicsClient *d365.D365, bioguidenClient *bioguide.Bio
 			if syncstate.TriggerPending(triggerFile) {
 				l.Info("trigger file detected — starting on-demand sync")
 				syncstate.ClearTrigger(triggerFile)
-				runSync(dynamicsClient, bioguidenClient)
+				runSync(dynamicsClient, bioguidenClient, cashAccounts)
 			} else {
 				appLog.Debug("trigger poll — no trigger pending", "component", "Scheduler")
 			}
@@ -152,12 +237,12 @@ func startTriggerPoller(dynamicsClient *d365.D365, bioguidenClient *bioguide.Bio
 	}()
 }
 
-func scheduleExportJob(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioGuiden) {
+func scheduleExportJob(dynamicsClient *d365.D365, bioguidenClient *bioguide.BioGuiden, cashAccounts []cashAccount) {
 	l := appLog.With("component", "Scheduler")
 	s := gocron.NewScheduler(time.Local)
 	job, _ := s.Every(1).Days().At("02:00").Do(func() {
 		l.Info("scheduled sync triggered")
-		runSync(dynamicsClient, bioguidenClient)
+		runSync(dynamicsClient, bioguidenClient, cashAccounts)
 	})
 
 	nextRun := job.NextRun()

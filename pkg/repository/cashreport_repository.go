@@ -3,6 +3,7 @@ package repository
 import (
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"log/slog"
 	"os"
 	"strings"
@@ -35,9 +36,9 @@ func NewCashReportRepository(dynamics *d365.D365, bioClient *bioguide.BioGuiden,
 func (r *CashReportRepository) Export(updatedDate time.Time) (response *entity.CashReportsDistributoristExport, err error) {
 	hostname, _ := os.Hostname()
 	xmlDocument := `<?xml version="1.0" encoding="iso8859-1"?>
-<document schema="CashReportsDistributorExportSchema1_3.xsd">
+<document schema="CashReportsDistributorExportSchema1_6.xsd">
     <information>
-        <name>Cashreport list export v1.3</name>
+        <name>Cashreport export v1.6</name>
         <description>Retrieves a list of all cashreports in the given span that the distributor user has access to from https://service.bioguiden.se</description>
         <log-id>` + uuid.New().String() + `</log-id>
         <created>` + time.Now().Format("2006-01-02T15:04:05") + `</created>
@@ -52,11 +53,13 @@ func (r *CashReportRepository) Export(updatedDate time.Time) (response *entity.C
 	resp, err := r.bioguidenClient.SOAPRequest("CashReportsDistributorExport.asmx", xmlDocument)
 	if err != nil {
 		r.log.Error("BioGuiden Export request failed", "date", updatedDate.Format("2006-01-02"), "err", err)
-	} else {
-		r.log.Debug("BioGuiden Export response received", "date", updatedDate.Format("2006-01-02"), "bytes", len(resp))
+		return nil, err
 	}
-	xml.Unmarshal(resp, &response)
-	return
+	r.log.Debug("BioGuiden Export response received", "date", updatedDate.Format("2006-01-02"), "bytes", len(resp))
+	if err = xml.Unmarshal(resp, &response); err != nil {
+		return nil, fmt.Errorf("cash report export: invalid response: %w", err)
+	}
+	return response, nil
 }
 
 func (r *CashReportRepository) ExportList(startDate, endDate time.Time) (response *entity.CashReportsDistributoristListExport, err error) {
@@ -80,16 +83,35 @@ func (r *CashReportRepository) ExportList(startDate, endDate time.Time) (respons
 	resp, err := r.bioguidenClient.SOAPRequest("CashReportsDistributorListExport.asmx", xmlDocument)
 	if err != nil {
 		r.log.Error("BioGuiden ExportList request failed", "start", startDate.Format("2006-01-02"), "end", endDate.Format("2006-01-02"), "err", err)
+		return nil, err
 	}
-	xml.Unmarshal(resp, &response)
-	return
+	if err = xml.Unmarshal(resp, &response); err != nil {
+		return nil, fmt.Errorf("cash report list export: invalid response: %w", err)
+	}
+	return response, nil
 }
 
 func (r *CashReportRepository) PostToD365(endpoint, data string) (resp []byte, err error) {
 	if strings.Contains(endpoint, "(") {
-		return r.dynamics.PatchRequest(endpoint, data)
+		resp, err = r.dynamics.PatchRequest(endpoint, data)
+	} else {
+		resp, err = r.dynamics.PostRequest(endpoint, data)
 	}
-	return r.dynamics.PostRequest(endpoint, data)
+	if err != nil {
+		return resp, err
+	}
+	// The D365 client does not look at the HTTP status, so surface OData error
+	// bodies here (e.g. unknown property or missing column) instead of dropping rows silently.
+	var odataErr struct {
+		Error *struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(resp, &odataErr) == nil && odataErr.Error != nil {
+		return resp, fmt.Errorf("D365 %s: %s: %s", endpoint, odataErr.Error.Code, odataErr.Error.Message)
+	}
+	return resp, nil
 }
 
 func (r *CashReportRepository) FetchFromD365() (data []*entity.DynamicsBooking, err error) {

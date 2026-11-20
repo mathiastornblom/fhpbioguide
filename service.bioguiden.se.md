@@ -15,7 +15,7 @@ Every SOAP call passes credentials as positional string parameters — no sessio
 method(username, password, xmlDocument)
 ```
 
-Configured in `config.yaml` under `bio.username` and `bio.password`. The client is built in `pkg/api/bioguide/base.go`.
+Configured in `config.yaml` under `bio.username` and `bio.password` (FHP Riks, id 26). Further distributor accounts for cash reports are listed under `bio.extraCashDistributors` (e.g. FHP Service, id 423). Each account gets its own client built in `pkg/api/bioguide/base.go`; username, password and document are XML-escaped.
 
 All communication is over HTTPS (SSL/SHA-256). Requests are not restricted by IP.
 
@@ -93,7 +93,7 @@ On hard failures BioGuiden returns an `ErrorResult` instead of the normal respon
 | `1003` | Access denied |
 | `1004` | Referenced object not found |
 
-The repositories in this project use `xml.Unmarshal` directly into the expected response struct. If BioGuiden returns an `ErrorResult`, the unmarshal will silently produce an empty struct — callers should check for empty/nil data after the call. Error details are printed to stdout and the log file but not propagated as typed errors in most cases.
+`SOAPRequest` returns a `*bioguide.APIError` (HTTP status, BioGuiden `error-nbr` and message) for non-2xx responses, SOAP faults and `ErrorResult` bodies, so a wrong login or missing access (1003) is an error, not an empty result. The cash report repository also returns XML unmarshal errors.
 
 ---
 
@@ -202,11 +202,13 @@ Note: TheatreExport is currently **not called** by the nightly job (`ExecuteExpo
 ### 3. CashReportsDistributorExport
 
 **Endpoint:** `CashReportsDistributorExport.asmx`
-**Schema:** `CashReportsDistributorExportSchema1_3.xsd` (version 1.3)
+**Schema:** `CashReportsDistributorExportSchema1_6.xsd` (version 1.6, the current one)
 **Go entity:** `entity.CashReportsDistributoristExport` in `pkg/entity/cashreport.go`
 **Repository:** `pkg/repository/cashreport_repository.go`
 
-Returns fully-approved cash reports (distributor view) updated since a given datetime. The nightly job queries the last 24 hours: `time.Now().Add(-24 * time.Hour)`.
+Returns fully-approved cash reports (distributor view) updated on a given date. The sync first asks `CashReportsDistributorListExport` for the dates with changes since the last successful sync, then fetches each date. This is done once per configured account (FHP Riks and any `bio.extraCashDistributors`); every imported row gets the account's id in D365 `new_distributorid`. Each account has its own sync tracker in `sync_state.json` (`distributors` keyed by id), so a failing account does not stop the others or hold back their window: only the accounts that succeeded are advanced, the failed one retries its window next run (re-import is idempotent). An account without an entry starts from the global `last_sync_completed` (older state files keep working), or 48 hours back if that is missing too. `last_sync_completed` itself only advances when every account succeeded.
+
+API status: 1.6 is the current version (1.5 closed 2026-04-16, 1.4 and 1.3 obsolete). From 1.4 `category` in ticket details is replaced by `type-id` + `specification`; 1.5 adds `movie.language`/`movie.subtitles`; 1.6 adds `show.type-id`. The sync stores `specification` when set, otherwise the name of the ticket `type-id` (table in `pkg/api/handler/tickettype.go`), otherwise `Biljettyp <id>`; the legacy `category` is still honoured if a response contains it.
 
 #### Request `<data>` block
 
@@ -240,7 +242,8 @@ Returns fully-approved cash reports (distributor view) updated since a given dat
 
 | XML field | Go field | Used for |
 |-----------|----------|---------|
-| `category` | `Category` | D365 `new_name` and `new_ticketcategory` |
+| `specification` / `type-id` (1.4+) | `Specification` / `TypeID` | D365 `new_name` and `new_ticketcategory`: specification, else type-id name (e.g. 1000 = Ordinarie, 3030 = Fribiljett: Press) |
+| `category` (≤1.3) | `Category` | Fallback only |
 | `quantity` | `Quantity` | D365 `new_ticket_quantity` |
 | `price` | `Price` | D365 `new_ticket_price` (comma → dot before float parse) |
 
@@ -250,7 +253,7 @@ Returns fully-approved cash reports (distributor view) updated since a given dat
 **Schema:** `CashReportsDistributorListExportSchema1_2.xsd`
 **Go entity:** `entity.CashReportsDistributoristListExport`
 
-Returns a list of dates with approved cash reports between a start and end date, without the full report data. Used by `CashListExport` (in `export.go`) to drive backfill runs for a specific date range. Not part of the regular nightly job.
+Returns a list of dates with approved cash reports between a start and end date, without the full report data. Used by `CashExport` (in `export.go`) to find the dates to import in each run.
 
 ---
 

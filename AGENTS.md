@@ -73,7 +73,7 @@ Logs to `fhpbioguide.log` in the working directory.
 |--------|------------------|----------------|-------------|------------|
 | **MovieExport** | `moviesexport.asmx` | `MoviesExportSchema1_13.xsd` | `products` | `pkg/repository/movieexport_repository.go` |
 | **TheatreExport** | `TheatreExport.asmx` | (v1.1) | `new_lokals` | `pkg/repository/theatreexport_repository.go` |
-| **CashExport** | `CashReportsDistributorExport.asmx` | `CashReportsDistributorExportSchema1_3.xsd` | `new_cashreports` | `pkg/repository/cashreport_repository.go` |
+| **CashExport** | `CashReportsDistributorExport.asmx` | `CashReportsDistributorExportSchema1_6.xsd` | `new_cashreports` | `pkg/repository/cashreport_repository.go` |
 
 #### MovieExport
 

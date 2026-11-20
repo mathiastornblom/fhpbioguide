@@ -33,7 +33,7 @@ Build output lands in `out/fhp-reports/` and `out/fhp-bioguide/`.
 Both apps read `config.yaml` from the working directory via Viper. The app panics at startup if the file is missing. Key config sections:
 
 - `Dynamics` — D365 OAuth2 credentials (clientID, clientSecret, tenantID, URL)
-- `bio` — BioGuiden SOAP credentials (Username, Password, URL)
+- `bio` — BioGuiden SOAP credentials (Username, Password, URL) for the main account (FHP Riks, `bio.id` 26). `bio.extraCashDistributors` lists further distributor accounts (name, id, Username, Password) that are used for **cash reports only**, e.g. FHP Service (id 423)
 - `report` — fhpreports domain and Bearer token for `/api/*` authorization
 - `proxy` — Movie Transit Logic App webhook URL and Basic auth
 
@@ -49,7 +49,7 @@ Three export pipelines, each following the same pattern:
 |---|---|---|
 | MovieExport | XML movie catalog (2018–2030) | Product entities |
 | TheatreExport | Theatres and salons | `new_lokal` + accounts |
-| CashExport | 24h cash reports | `new_cashreport` entities |
+| CashExport | cash reports since last sync, once per configured account (each account has its own sync tracker in `sync_state.json`) | `new_cashreport` entities (`new_distributorid` = 26 / 423) |
 
 ### App 2: fhpreports (`cmd/fhpreports/`)
 A **Fiber HTTPS web service** (port 443, Let's Encrypt) serving HTML forms for cinema staff to report ticket sales. Form data is written to MySQL and pushed to D365 booking entities, then a Power Automate webhook is triggered.
