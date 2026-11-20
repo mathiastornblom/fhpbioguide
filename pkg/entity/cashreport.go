@@ -349,6 +349,9 @@ type DynamicsCashReport struct {
 	TicketQuantity        int        `json:"new_ticket_quantity"`
 	TicketPrice           float64    `json:"new_ticket_price"`
 	Source                int        `json:"new_source"`
+	// DistributorID is the BioGuiden distributor account (26 = FHP Riks, 423 = FHP Service)
+	// that fetched the report. Left empty (omitted) for rows not originating from BioGuiden.
+	DistributorID         int        `json:"new_distributorid,omitempty"`
 	ShowDate              time.Time  `json:"new_startdate"`
 	Playweek              string     `json:"new_playweek"`
 	RecordedAmount        float64    `json:"new_recordedamount"`

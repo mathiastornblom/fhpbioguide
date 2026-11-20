@@ -10,8 +10,17 @@ Dynamics:
 
 bio:
   URL: 'https://service.bioguiden.se'
-  Username: '<bioguiden-username>'
+  Username: '<bioguiden-username>'     # main account (FHP Riks): movies, theatres and cash reports
   Password: '<bioguiden-password>'
+  id: 26                               # written to new_distributorid on cash reports (default 26)
+  name: 'FHP Riks'                     # label in logs (default "FHP Riks")
+  # Additional distributor accounts. Cash reports only. Fetched after the main account;
+  # every row gets that account's id in new_distributorid.
+  extraCashDistributors:
+    - name: 'FHP Service'
+      id: 423
+      Username: '<bioguiden-username>'
+      Password: '<bioguiden-password>'
 
 report:
   URL: '<fhpreports-domain>'           # e.g. registrera.example.se (no https://)
